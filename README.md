@@ -8,6 +8,7 @@ Run from repo root:
 
 ```bash
 dotnet run --project source/Aos.ReplayCli -- \
+  --workflow hello \
   --manifest source/Aos.WebApi.Tests/Golden/hello-workflow-v1/manifest.json \
   --eventlog source/Aos.WebApi.Tests/Golden/hello-workflow-v1/eventlog.jsonl
 ```

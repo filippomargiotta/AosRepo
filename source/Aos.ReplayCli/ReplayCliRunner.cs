@@ -1,13 +1,15 @@
 using System.Text;
 using System.Text.Json;
 using Aos.WebApi.Models;
-using Aos.WebApi.Options;
-using Aos.WebApi.Services;
 
 namespace Aos.ReplayCli;
 
 public static class ReplayCliRunner
 {
+    private static readonly IReadOnlyDictionary<string, IReplayWorkflow> Workflows =
+        new IReplayWorkflow[] { new HelloReplayWorkflow() }
+            .ToDictionary(workflow => workflow.WorkflowName, StringComparer.OrdinalIgnoreCase);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -23,7 +25,7 @@ public static class ReplayCliRunner
         if (!TryParseArgs(args, out var request, out var parseError))
         {
             await stderr.WriteLineAsync(parseError);
-            await stderr.WriteLineAsync("Usage: aos-replay --manifest <path> --eventlog <path>");
+            await stderr.WriteLineAsync(GetUsageText());
             return 2;
         }
 
@@ -45,14 +47,14 @@ public static class ReplayCliRunner
                 return 1;
             }
 
-            var replayTimeSource = new ReplayTimeSource(expectedEntries.Select(entry => entry.OccurredAtUtc));
-            var helloWorkflowOptions = CreateOptionsFromManifest(manifest);
-            var service = new HelloWorkflowService(
-                new FixedSeedProvider(manifest.Seed),
-                replayTimeSource,
-                Microsoft.Extensions.Options.Options.Create(helloWorkflowOptions));
+            if (!Workflows.TryGetValue(request.WorkflowName, out var workflow))
+            {
+                await stderr.WriteLineAsync(
+                    $"Unknown workflow '{request.WorkflowName}'. Available workflows: {string.Join(", ", GetWorkflowNames())}.");
+                return 2;
+            }
 
-            var actual = service.CreateHelloArtifacts(manifest.RunId);
+            var actual = workflow.Replay(manifest, expectedEntries);
             var mismatches = GetDeterministicMismatches(manifest, actual.Manifest);
 
             var expectedEventLogJson = SerializeEventLogLines(expectedEntries);
@@ -108,6 +110,7 @@ public static class ReplayCliRunner
             return false;
         }
 
+        string? workflowName = null;
         string? manifestPath = null;
         string? eventLogPath = null;
 
@@ -115,6 +118,9 @@ public static class ReplayCliRunner
         {
             switch (args[i])
             {
+                case "--workflow" when i + 1 < args.Length:
+                    workflowName = args[++i];
+                    break;
                 case "--manifest" when i + 1 < args.Length:
                     manifestPath = args[++i];
                     break;
@@ -127,13 +133,15 @@ public static class ReplayCliRunner
             }
         }
 
-        if (string.IsNullOrWhiteSpace(manifestPath) || string.IsNullOrWhiteSpace(eventLogPath))
+        if (string.IsNullOrWhiteSpace(workflowName) ||
+            string.IsNullOrWhiteSpace(manifestPath) ||
+            string.IsNullOrWhiteSpace(eventLogPath))
         {
-            error = "Both --manifest and --eventlog are required.";
+            error = "The --workflow, --manifest, and --eventlog arguments are required.";
             return false;
         }
 
-        request = new ReplayRequest(manifestPath, eventLogPath);
+        request = new ReplayRequest(workflowName, manifestPath, eventLogPath);
         return true;
     }
 
@@ -168,36 +176,6 @@ public static class ReplayCliRunner
         }
 
         return entries;
-    }
-
-    private static HelloWorkflowOptions CreateOptionsFromManifest(Manifest manifest)
-    {
-        return new HelloWorkflowOptions
-        {
-            Models = manifest.Models
-                .Select(model => new HelloWorkflowModelOptions
-                {
-                    ModelId = model.ModelId,
-                    Provider = model.Provider,
-                    Version = model.Version
-                })
-                .ToList(),
-            Tools = manifest.Tools
-                .Select(tool => new HelloWorkflowToolOptions
-                {
-                    ToolId = tool.ToolId,
-                    Version = tool.Version
-                })
-                .ToList(),
-            PolicyDecisions = manifest.PolicyDecisions
-                .Select(policy => new HelloWorkflowPolicyOptions
-                {
-                    PolicyId = policy.PolicyId,
-                    Decision = policy.Decision,
-                    Reason = policy.Reason
-                })
-                .ToList()
-        };
     }
 
     private static List<string> GetDeterministicMismatches(Manifest expected, Manifest actual)
@@ -259,18 +237,12 @@ public static class ReplayCliRunner
         return builder.ToString();
     }
 
-    private sealed class FixedSeedProvider : ISeedProvider
+    private static string GetUsageText()
     {
-        private readonly SeedInfo _seed;
-
-        public FixedSeedProvider(SeedInfo seed)
-        {
-            _seed = seed;
-        }
-
-        public SeedInfo GetLockedSeed(string runId)
-            => _seed;
+        return $"Usage: aos-replay --workflow <name> --manifest <path> --eventlog <path>{Environment.NewLine}Available workflows: {string.Join(", ", GetWorkflowNames())}";
     }
 
-    private readonly record struct ReplayRequest(string ManifestPath, string EventLogPath);
+    private static IEnumerable<string> GetWorkflowNames() => Workflows.Keys.OrderBy(name => name, StringComparer.Ordinal);
+
+    private readonly record struct ReplayRequest(string WorkflowName, string ManifestPath, string EventLogPath);
 }

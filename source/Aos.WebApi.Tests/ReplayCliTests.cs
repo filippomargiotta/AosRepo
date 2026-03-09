@@ -16,7 +16,7 @@ public sealed class ReplayCliTests
         using var stderr = new StringWriter();
 
         var exitCode = await ReplayCliRunner.RunAsync(
-            ["--manifest", manifestPath, "--eventlog", eventLogPath],
+            ["--workflow", "hello", "--manifest", manifestPath, "--eventlog", eventLogPath],
             stdout,
             stderr,
             CancellationToken.None);
@@ -51,7 +51,7 @@ public sealed class ReplayCliTests
             using var stderr = new StringWriter();
 
             var exitCode = await ReplayCliRunner.RunAsync(
-                ["--manifest", manifestPath, "--eventlog", eventLogPath],
+                ["--workflow", "hello", "--manifest", manifestPath, "--eventlog", eventLogPath],
                 stdout,
                 stderr,
                 CancellationToken.None);
@@ -72,7 +72,7 @@ public sealed class ReplayCliTests
         using var stderr = new StringWriter();
 
         var exitCode = await ReplayCliRunner.RunAsync(
-            ["--manifest", "/no/such/manifest.json", "--eventlog", "/no/such/eventlog.jsonl"],
+            ["--workflow", "hello", "--manifest", "/no/such/manifest.json", "--eventlog", "/no/such/eventlog.jsonl"],
             stdout,
             stderr,
             CancellationToken.None);
@@ -99,7 +99,7 @@ public sealed class ReplayCliTests
             using var stderr = new StringWriter();
 
             var exitCode = await ReplayCliRunner.RunAsync(
-                ["--manifest", manifestPath, "--eventlog", eventLogPath],
+                ["--workflow", "hello", "--manifest", manifestPath, "--eventlog", eventLogPath],
                 stdout,
                 stderr,
                 CancellationToken.None);
@@ -111,6 +111,43 @@ public sealed class ReplayCliTests
         {
             Directory.Delete(tempDir, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenWorkflowArgumentIsMissing_ReturnsUsageErrorCode()
+    {
+        var manifestPath = GetGoldenPath("manifest.json");
+        var eventLogPath = GetGoldenPath("eventlog.jsonl");
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+
+        var exitCode = await ReplayCliRunner.RunAsync(
+            ["--manifest", manifestPath, "--eventlog", eventLogPath],
+            stdout,
+            stderr,
+            CancellationToken.None);
+
+        Assert.Equal(2, exitCode);
+        Assert.Contains("The --workflow, --manifest, and --eventlog arguments are required.", stderr.ToString());
+        Assert.Contains("Usage: aos-replay --workflow <name> --manifest <path> --eventlog <path>", stderr.ToString());
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenWorkflowIsUnknown_ReturnsUsageErrorCode()
+    {
+        var manifestPath = GetGoldenPath("manifest.json");
+        var eventLogPath = GetGoldenPath("eventlog.jsonl");
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+
+        var exitCode = await ReplayCliRunner.RunAsync(
+            ["--workflow", "unknown", "--manifest", manifestPath, "--eventlog", eventLogPath],
+            stdout,
+            stderr,
+            CancellationToken.None);
+
+        Assert.Equal(2, exitCode);
+        Assert.Contains("Unknown workflow 'unknown'. Available workflows: hello.", stderr.ToString());
     }
 
     private static string GetGoldenPath(string fileName)
