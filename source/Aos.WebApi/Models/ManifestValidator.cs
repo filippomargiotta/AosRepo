@@ -10,6 +10,11 @@ public static class ManifestValidator
         {
             errors.Add("ManifestVersion is required.");
         }
+        else if (!SchemaVersions.IsSupportedManifestVersion(manifest.ManifestVersion))
+        {
+            errors.Add(
+                $"ManifestVersion '{manifest.ManifestVersion}' is not supported. Supported version: {SchemaVersions.CurrentManifestVersion}.");
+        }
 
         if (string.IsNullOrWhiteSpace(manifest.RunId))
         {
@@ -55,15 +60,73 @@ public static class ManifestValidator
         {
             errors.Add("At least one ModelRef is required.");
         }
+        else
+        {
+            for (var i = 0; i < manifest.Models.Count; i++)
+            {
+                var model = manifest.Models[i];
+                if (string.IsNullOrWhiteSpace(model.ModelId))
+                {
+                    errors.Add($"Models[{i}].ModelId is required.");
+                }
+
+                if (string.IsNullOrWhiteSpace(model.Provider))
+                {
+                    errors.Add($"Models[{i}].Provider is required.");
+                }
+
+                if (string.IsNullOrWhiteSpace(model.Version))
+                {
+                    errors.Add($"Models[{i}].Version is required.");
+                }
+            }
+        }
 
         if (manifest.Tools.Count == 0)
         {
             errors.Add("At least one ToolRef is required.");
         }
+        else
+        {
+            for (var i = 0; i < manifest.Tools.Count; i++)
+            {
+                var tool = manifest.Tools[i];
+                if (string.IsNullOrWhiteSpace(tool.ToolId))
+                {
+                    errors.Add($"Tools[{i}].ToolId is required.");
+                }
+
+                if (string.IsNullOrWhiteSpace(tool.Version))
+                {
+                    errors.Add($"Tools[{i}].Version is required.");
+                }
+            }
+        }
 
         if (manifest.PolicyDecisions.Count == 0)
         {
             errors.Add("At least one PolicyDecision is required.");
+        }
+        else
+        {
+            for (var i = 0; i < manifest.PolicyDecisions.Count; i++)
+            {
+                var policyDecision = manifest.PolicyDecisions[i];
+                if (string.IsNullOrWhiteSpace(policyDecision.PolicyId))
+                {
+                    errors.Add($"PolicyDecisions[{i}].PolicyId is required.");
+                }
+
+                if (string.IsNullOrWhiteSpace(policyDecision.Decision))
+                {
+                    errors.Add($"PolicyDecisions[{i}].Decision is required.");
+                }
+                else if (!policyDecision.Decision.Equals("allow", StringComparison.OrdinalIgnoreCase) &&
+                         !policyDecision.Decision.Equals("deny", StringComparison.OrdinalIgnoreCase))
+                {
+                    errors.Add($"PolicyDecisions[{i}].Decision must be 'allow' or 'deny'.");
+                }
+            }
         }
 
         if (manifest.CompletedAtUtc is not null &&

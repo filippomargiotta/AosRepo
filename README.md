@@ -14,3 +14,5 @@ dotnet run --project source/Aos.ReplayCli -- \
 ```
 
 Expected result: exit code `0` and a replay verification success message when artifacts match.
+
+Current schema/versioning rules for replay artifacts are documented in `project/SchemaVersioning.md`.

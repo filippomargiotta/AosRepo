@@ -35,7 +35,7 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
         var policyDecisions = ResolvePolicyDecisions();
 
         var manifest = new Manifest(
-            ManifestVersion: "0.1",
+            ManifestVersion: SchemaVersions.CurrentManifestVersion,
             RunId: runId,
             Seed: seed,
             TimeSource: timeSourceInfo,

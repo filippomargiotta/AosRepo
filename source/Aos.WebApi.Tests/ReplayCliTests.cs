@@ -7,6 +7,12 @@ namespace Aos.WebApi.Tests;
 
 public sealed class ReplayCliTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
+
     [Fact]
     public async Task RunAsync_WithGoldenArtifacts_ReturnsSuccess()
     {
@@ -41,10 +47,7 @@ public sealed class ReplayCliTests
                 EventType: "workflow.hello",
                 Data: new { message = "HELLO-MISMATCH", manifestVersion = "0.1" },
                 OccurredAtUtc: new DateTimeOffset(2026, 2, 26, 19, 0, 0, TimeSpan.Zero));
-            var json = JsonSerializer.Serialize(entry, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            });
+            var json = JsonSerializer.Serialize(entry, JsonOptions);
             await File.WriteAllTextAsync(eventLogPath, json + "\n");
 
             using var stdout = new StringWriter();
@@ -57,7 +60,122 @@ public sealed class ReplayCliTests
                 CancellationToken.None);
 
             Assert.Equal(1, exitCode);
-            Assert.Contains("Mismatch: Event log bytes differ from replay output.", stderr.ToString());
+            Assert.Contains(
+                "Mismatch: Event log line 1 field data.message differs: expected \"HELLO-MISMATCH\", actual \"hello\".",
+                stderr.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenManifestMismatches_ReturnsFieldLevelFailure()
+    {
+        var tempDir = CreateTempDir();
+        try
+        {
+            var manifestPath = Path.Combine(tempDir, "manifest.json");
+            var eventLogPath = Path.Combine(tempDir, "eventlog.jsonl");
+            var manifest = JsonSerializer.Deserialize<Manifest>(File.ReadAllText(GetGoldenPath("manifest.json")), JsonOptions);
+
+            Assert.NotNull(manifest);
+
+            await File.WriteAllTextAsync(
+                manifestPath,
+                JsonSerializer.Serialize(
+                    manifest! with { CompletedAtUtc = manifest.CompletedAtUtc?.AddMinutes(1) },
+                    JsonOptions));
+            File.Copy(GetGoldenPath("eventlog.jsonl"), eventLogPath);
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = await ReplayCliRunner.RunAsync(
+                ["--workflow", "hello", "--manifest", manifestPath, "--eventlog", eventLogPath],
+                stdout,
+                stderr,
+                CancellationToken.None);
+
+            Assert.Equal(1, exitCode);
+            Assert.Contains(
+                "Mismatch: Manifest field completedAtUtc differs: expected \"2026-02-26T19:01:00+00:00\", actual \"2026-02-26T19:00:00+00:00\".",
+                stderr.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenEventLogRunIdDoesNotMatchManifest_ReturnsCompatibilityFailure()
+    {
+        var tempDir = CreateTempDir();
+        try
+        {
+            var manifestPath = Path.Combine(tempDir, "manifest.json");
+            var eventLogPath = Path.Combine(tempDir, "eventlog.jsonl");
+            File.Copy(GetGoldenPath("manifest.json"), manifestPath);
+
+            var entry = new EventLogEntry(
+                RunId: "run-mismatch",
+                EventType: "workflow.hello",
+                Data: new { message = "hello", manifestVersion = SchemaVersions.CurrentManifestVersion },
+                OccurredAtUtc: new DateTimeOffset(2026, 2, 26, 19, 0, 0, TimeSpan.Zero));
+            await File.WriteAllTextAsync(eventLogPath, JsonSerializer.Serialize(entry, JsonOptions) + "\n");
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = await ReplayCliRunner.RunAsync(
+                ["--workflow", "hello", "--manifest", manifestPath, "--eventlog", eventLogPath],
+                stdout,
+                stderr,
+                CancellationToken.None);
+
+            Assert.Equal(1, exitCode);
+            Assert.Contains(
+                "Artifact compatibility failed: Event log line 1 runId 'run-mismatch' does not match manifest runId 'run-golden-hello-1'.",
+                stderr.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenEventLogManifestVersionDoesNotMatchManifest_ReturnsCompatibilityFailure()
+    {
+        var tempDir = CreateTempDir();
+        try
+        {
+            var manifestPath = Path.Combine(tempDir, "manifest.json");
+            var eventLogPath = Path.Combine(tempDir, "eventlog.jsonl");
+            File.Copy(GetGoldenPath("manifest.json"), manifestPath);
+
+            var entry = new EventLogEntry(
+                RunId: "run-golden-hello-1",
+                EventType: "workflow.hello",
+                Data: new { message = "hello", manifestVersion = "0.9" },
+                OccurredAtUtc: new DateTimeOffset(2026, 2, 26, 19, 0, 0, TimeSpan.Zero));
+            await File.WriteAllTextAsync(eventLogPath, JsonSerializer.Serialize(entry, JsonOptions) + "\n");
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = await ReplayCliRunner.RunAsync(
+                ["--workflow", "hello", "--manifest", manifestPath, "--eventlog", eventLogPath],
+                stdout,
+                stderr,
+                CancellationToken.None);
+
+            Assert.Equal(1, exitCode);
+            Assert.Contains(
+                "Artifact compatibility failed: Event log line 1 payload manifestVersion '0.9' does not match manifest version '0.1'.",
+                stderr.ToString());
         }
         finally
         {

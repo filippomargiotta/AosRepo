@@ -6,6 +6,7 @@ namespace Aos.ReplayCli;
 
 public static class ReplayCliRunner
 {
+    private const string IgnoredManifestField = "timeSource";
     private static readonly IReadOnlyDictionary<string, IReplayWorkflow> Workflows =
         new IReplayWorkflow[] { new HelloReplayWorkflow() }
             .ToDictionary(workflow => workflow.WorkflowName, StringComparer.OrdinalIgnoreCase);
@@ -47,6 +48,17 @@ public static class ReplayCliRunner
                 return 1;
             }
 
+            var compatibilityErrors = GetArtifactCompatibilityErrors(manifest, expectedEntries);
+            if (compatibilityErrors.Count > 0)
+            {
+                foreach (var compatibilityError in compatibilityErrors)
+                {
+                    await stderr.WriteLineAsync($"Artifact compatibility failed: {compatibilityError}");
+                }
+
+                return 1;
+            }
+
             if (!Workflows.TryGetValue(request.WorkflowName, out var workflow))
             {
                 await stderr.WriteLineAsync(
@@ -55,14 +67,18 @@ public static class ReplayCliRunner
             }
 
             var actual = workflow.Replay(manifest, expectedEntries);
-            var mismatches = GetDeterministicMismatches(manifest, actual.Manifest);
+            var mismatches = GetDeterministicManifestMismatches(manifest, actual.Manifest);
+            var eventLogMismatches = GetEventLogMismatches(expectedEntries, actual.EventLogEntries);
 
             var expectedEventLogJson = SerializeEventLogLines(expectedEntries);
             var actualEventLogJson = SerializeEventLogLines(actual.EventLogEntries);
-            if (!string.Equals(expectedEventLogJson, actualEventLogJson, StringComparison.Ordinal))
+            if (eventLogMismatches.Count == 0 &&
+                !string.Equals(expectedEventLogJson, actualEventLogJson, StringComparison.Ordinal))
             {
-                mismatches.Add("Event log bytes differ from replay output.");
+                eventLogMismatches.Add("Event log bytes differ from replay output.");
             }
+
+            mismatches.AddRange(eventLogMismatches);
 
             if (mismatches.Count > 0)
             {
@@ -178,51 +194,237 @@ public static class ReplayCliRunner
         return entries;
     }
 
-    private static List<string> GetDeterministicMismatches(Manifest expected, Manifest actual)
+    private static List<string> GetDeterministicManifestMismatches(Manifest expected, Manifest actual)
+    {
+        var differences = new List<JsonDifference>();
+        AddJsonDifferences(
+            JsonSerializer.SerializeToElement(expected, JsonOptions),
+            JsonSerializer.SerializeToElement(actual, JsonOptions),
+            path: string.Empty,
+            differences,
+            new HashSet<string>(StringComparer.Ordinal) { IgnoredManifestField });
+
+        return differences
+            .Select(difference => $"Manifest field {FormatFieldPath(difference.Path)} differs: {difference.Message}.")
+            .ToList();
+    }
+
+    private static List<string> GetEventLogMismatches(
+        IReadOnlyList<EventLogEntry> expectedEntries,
+        IReadOnlyList<EventLogEntry> actualEntries)
     {
         var mismatches = new List<string>();
+        var sharedCount = Math.Min(expectedEntries.Count, actualEntries.Count);
 
-        if (!string.Equals(expected.ManifestVersion, actual.ManifestVersion, StringComparison.Ordinal))
+        if (expectedEntries.Count != actualEntries.Count)
         {
-            mismatches.Add("ManifestVersion differs.");
+            mismatches.Add($"Event log line count differs: expected {expectedEntries.Count}, actual {actualEntries.Count}.");
         }
 
-        if (!string.Equals(expected.RunId, actual.RunId, StringComparison.Ordinal))
+        for (var i = 0; i < sharedCount; i++)
         {
-            mismatches.Add("RunId differs.");
+            var differences = new List<JsonDifference>();
+            AddJsonDifferences(
+                JsonSerializer.SerializeToElement(expectedEntries[i], JsonOptions),
+                JsonSerializer.SerializeToElement(actualEntries[i], JsonOptions),
+                path: string.Empty,
+                differences);
+
+            mismatches.AddRange(
+                differences.Select(difference =>
+                    $"Event log line {i + 1} field {FormatFieldPath(difference.Path)} differs: {difference.Message}."));
         }
 
-        if (expected.Seed != actual.Seed)
+        for (var i = sharedCount; i < expectedEntries.Count; i++)
         {
-            mismatches.Add("Seed differs.");
+            mismatches.Add($"Event log line {i + 1} is missing from replay output.");
         }
 
-        if (!expected.Models.SequenceEqual(actual.Models))
+        for (var i = sharedCount; i < actualEntries.Count; i++)
         {
-            mismatches.Add("Models differ.");
-        }
-
-        if (!expected.Tools.SequenceEqual(actual.Tools))
-        {
-            mismatches.Add("Tools differ.");
-        }
-
-        if (!expected.PolicyDecisions.SequenceEqual(actual.PolicyDecisions))
-        {
-            mismatches.Add("PolicyDecisions differ.");
-        }
-
-        if (expected.StartedAtUtc != actual.StartedAtUtc)
-        {
-            mismatches.Add("StartedAtUtc differs.");
-        }
-
-        if (expected.CompletedAtUtc != actual.CompletedAtUtc)
-        {
-            mismatches.Add("CompletedAtUtc differs.");
+            mismatches.Add($"Event log line {i + 1} is unexpected in replay output.");
         }
 
         return mismatches;
+    }
+
+    private static List<string> GetArtifactCompatibilityErrors(
+        Manifest manifest,
+        IReadOnlyList<EventLogEntry> eventLogEntries)
+    {
+        var errors = new List<string>();
+
+        for (var i = 0; i < eventLogEntries.Count; i++)
+        {
+            var entry = eventLogEntries[i];
+
+            if (!string.Equals(entry.RunId, manifest.RunId, StringComparison.Ordinal))
+            {
+                errors.Add(
+                    $"Event log line {i + 1} runId '{entry.RunId}' does not match manifest runId '{manifest.RunId}'.");
+            }
+
+            if (!TryGetPayloadManifestVersion(entry, out var payloadManifestVersion))
+            {
+                continue;
+            }
+
+            if (!string.Equals(payloadManifestVersion, manifest.ManifestVersion, StringComparison.Ordinal))
+            {
+                errors.Add(
+                    $"Event log line {i + 1} payload manifestVersion '{payloadManifestVersion}' does not match manifest version '{manifest.ManifestVersion}'.");
+            }
+        }
+
+        return errors;
+    }
+
+    private static bool TryGetPayloadManifestVersion(EventLogEntry entry, out string? manifestVersion)
+    {
+        manifestVersion = null;
+        if (entry.Data is null)
+        {
+            return false;
+        }
+
+        var data = JsonSerializer.SerializeToElement(entry.Data, JsonOptions);
+        if (data.ValueKind != JsonValueKind.Object ||
+            !data.TryGetProperty("manifestVersion", out var manifestVersionElement) ||
+            manifestVersionElement.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        manifestVersion = manifestVersionElement.GetString();
+        return !string.IsNullOrWhiteSpace(manifestVersion);
+    }
+
+    private static void AddJsonDifferences(
+        JsonElement expected,
+        JsonElement actual,
+        string path,
+        ICollection<JsonDifference> differences,
+        IReadOnlySet<string>? ignoredRootProperties = null)
+    {
+        if (expected.ValueKind != actual.ValueKind)
+        {
+            differences.Add(new JsonDifference(
+                path,
+                $"expected kind {expected.ValueKind}, actual kind {actual.ValueKind}"));
+            return;
+        }
+
+        switch (expected.ValueKind)
+        {
+            case JsonValueKind.Object:
+                CompareObjectProperties(expected, actual, path, differences, ignoredRootProperties);
+                break;
+            case JsonValueKind.Array:
+                CompareArrayItems(expected, actual, path, differences);
+                break;
+            case JsonValueKind.String:
+            case JsonValueKind.Number:
+            case JsonValueKind.True:
+            case JsonValueKind.False:
+            case JsonValueKind.Null:
+                if (!string.Equals(expected.GetRawText(), actual.GetRawText(), StringComparison.Ordinal))
+                {
+                    differences.Add(new JsonDifference(
+                        path,
+                        $"expected {expected.GetRawText()}, actual {actual.GetRawText()}"));
+                }
+
+                break;
+        }
+    }
+
+    private static void CompareObjectProperties(
+        JsonElement expected,
+        JsonElement actual,
+        string path,
+        ICollection<JsonDifference> differences,
+        IReadOnlySet<string>? ignoredRootProperties)
+    {
+        var expectedProperties = expected.EnumerateObject()
+            .ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
+        var actualProperties = actual.EnumerateObject()
+            .ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
+
+        foreach (var propertyName in expectedProperties.Keys.Union(actualProperties.Keys).OrderBy(name => name, StringComparer.Ordinal))
+        {
+            if (path.Length == 0 && ignoredRootProperties?.Contains(propertyName) == true)
+            {
+                continue;
+            }
+
+            var childPath = JoinPath(path, propertyName);
+            var hasExpected = expectedProperties.TryGetValue(propertyName, out var expectedValue);
+            var hasActual = actualProperties.TryGetValue(propertyName, out var actualValue);
+
+            if (!hasExpected)
+            {
+                differences.Add(new JsonDifference(childPath, "unexpected in replay output"));
+                continue;
+            }
+
+            if (!hasActual)
+            {
+                differences.Add(new JsonDifference(childPath, "missing from replay output"));
+                continue;
+            }
+
+            AddJsonDifferences(expectedValue, actualValue, childPath, differences);
+        }
+    }
+
+    private static void CompareArrayItems(
+        JsonElement expected,
+        JsonElement actual,
+        string path,
+        ICollection<JsonDifference> differences)
+    {
+        var expectedItems = expected.EnumerateArray().ToArray();
+        var actualItems = actual.EnumerateArray().ToArray();
+        var sharedCount = Math.Min(expectedItems.Length, actualItems.Length);
+
+        if (expectedItems.Length != actualItems.Length)
+        {
+            differences.Add(new JsonDifference(
+                path,
+                $"expected {expectedItems.Length} item(s), actual {actualItems.Length}"));
+        }
+
+        for (var i = 0; i < sharedCount; i++)
+        {
+            AddJsonDifferences(expectedItems[i], actualItems[i], JoinPath(path, $"[{i}]"), differences);
+        }
+
+        for (var i = sharedCount; i < expectedItems.Length; i++)
+        {
+            differences.Add(new JsonDifference(JoinPath(path, $"[{i}]"), "missing from replay output"));
+        }
+
+        for (var i = sharedCount; i < actualItems.Length; i++)
+        {
+            differences.Add(new JsonDifference(JoinPath(path, $"[{i}]"), "unexpected in replay output"));
+        }
+    }
+
+    private static string JoinPath(string path, string segment)
+    {
+        if (path.Length == 0)
+        {
+            return segment;
+        }
+
+        return segment.StartsWith("[", StringComparison.Ordinal)
+            ? $"{path}{segment}"
+            : $"{path}.{segment}";
+    }
+
+    private static string FormatFieldPath(string path)
+    {
+        return string.IsNullOrWhiteSpace(path) ? "<root>" : path;
     }
 
     private static string SerializeEventLogLines(IEnumerable<EventLogEntry> entries)
@@ -243,6 +445,8 @@ public static class ReplayCliRunner
     }
 
     private static IEnumerable<string> GetWorkflowNames() => Workflows.Keys.OrderBy(name => name, StringComparer.Ordinal);
+
+    private sealed record JsonDifference(string Path, string Message);
 
     private readonly record struct ReplayRequest(string WorkflowName, string ManifestPath, string EventLogPath);
 }

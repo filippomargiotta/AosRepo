@@ -61,4 +61,52 @@ public sealed class ManifestValidatorTests
 
         Assert.NotEmpty(errors);
     }
+
+    [Fact]
+    public void UnsupportedManifestVersion_FailsValidation()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var manifest = new Manifest(
+            ManifestVersion: "0.2",
+            RunId: "run-1",
+            Seed: new SeedInfo("seed-1", "xoroshiro128**", 123, "static test"),
+            TimeSource: new TimeSourceInfo("record", "system-utc", "clock-1", "utc-millis", null),
+            Models: new[] { new ModelRef("model-1", "local", "0.0") },
+            Tools: new[] { new ToolRef("tool-1", "0.0") },
+            PolicyDecisions: new[] { new PolicyDecision("policy-1", "allow", null) },
+            StartedAtUtc: now,
+            CompletedAtUtc: now);
+
+        var errors = ManifestValidator.Validate(manifest);
+
+        Assert.Contains(
+            "ManifestVersion '0.2' is not supported. Supported version: 0.1.",
+            errors);
+    }
+
+    [Fact]
+    public void MissingNestedReferenceFields_FailsValidation()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var manifest = new Manifest(
+            ManifestVersion: SchemaVersions.CurrentManifestVersion,
+            RunId: "run-1",
+            Seed: new SeedInfo("seed-1", "xoroshiro128**", 123, "static test"),
+            TimeSource: new TimeSourceInfo("record", "system-utc", "clock-1", "utc-millis", null),
+            Models: new[] { new ModelRef("", "", "") },
+            Tools: new[] { new ToolRef("", "") },
+            PolicyDecisions: new[] { new PolicyDecision("", "maybe", null) },
+            StartedAtUtc: now,
+            CompletedAtUtc: now);
+
+        var errors = ManifestValidator.Validate(manifest);
+
+        Assert.Contains("Models[0].ModelId is required.", errors);
+        Assert.Contains("Models[0].Provider is required.", errors);
+        Assert.Contains("Models[0].Version is required.", errors);
+        Assert.Contains("Tools[0].ToolId is required.", errors);
+        Assert.Contains("Tools[0].Version is required.", errors);
+        Assert.Contains("PolicyDecisions[0].PolicyId is required.", errors);
+        Assert.Contains("PolicyDecisions[0].Decision must be 'allow' or 'deny'.", errors);
+    }
 }
