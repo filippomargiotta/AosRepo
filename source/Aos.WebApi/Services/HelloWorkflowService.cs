@@ -9,15 +9,18 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
     private readonly ISeedProvider _seedProvider;
     private readonly ITimeSource _timeSource;
     private readonly HelloWorkflowOptions _options;
+    private readonly IEventLogIntegrityChain _eventLogIntegrityChain;
 
     public HelloWorkflowService(
         ISeedProvider seedProvider,
         ITimeSource timeSource,
-        IOptions<HelloWorkflowOptions> options)
+        IOptions<HelloWorkflowOptions> options,
+        IEventLogIntegrityChain eventLogIntegrityChain)
     {
         _seedProvider = seedProvider;
         _timeSource = timeSource;
         _options = options.Value;
+        _eventLogIntegrityChain = eventLogIntegrityChain;
     }
 
     public HelloWorkflowArtifacts CreateHelloArtifacts(string runId)
@@ -59,7 +62,7 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
 
         return new HelloWorkflowArtifacts(
             Manifest: manifest,
-            EventLogEntries: new[] { entry });
+            EventLogRecords: _eventLogIntegrityChain.SignEntries([entry]));
     }
 
     private IReadOnlyList<ModelRef> ResolveModels()

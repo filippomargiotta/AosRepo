@@ -1,1 +1,1 @@
-﻿{"runId":"3dbda41358ab41d19292e903f59e5839","eventType":"workflow.hello","data":{"message":"hello","manifestVersion":"0.1"},"occurredAtUtc":"2026-01-29T19:05:35.905493+00:00"}
+﻿{"schemaVersion":"0.2","entry":{"runId":"3dbda41358ab41d19292e903f59e5839","eventType":"workflow.hello","data":{"message":"hello","manifestVersion":"0.1"},"occurredAtUtc":"2026-01-29T19:05:35.905493+00:00"},"integrity":{"algorithm":"HMAC-SHA256","keyId":"local-dev","previousChainMac":null,"chainMac":"a4d19d754cf035c436dbedb5e0d9d7027cf309aca2548bdac462554259609573"}}

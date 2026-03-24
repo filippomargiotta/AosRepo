@@ -4,5 +4,5 @@ namespace Aos.WebApi.Services;
 
 public interface IEventLogWriter
 {
-    Task WriteAsync(EventLogEntry entry, CancellationToken cancellationToken = default);
+    Task WriteAsync(EventLogRecord record, CancellationToken cancellationToken = default);
 }

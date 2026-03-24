@@ -48,9 +48,9 @@ public class WorkflowController : ControllerBase
             runId,
             artifacts.Manifest.ManifestVersion);
 
-        foreach (var entry in artifacts.EventLogEntries)
+        foreach (var record in artifacts.EventLogRecords)
         {
-            await _eventLogWriter.WriteAsync(entry, cancellationToken);
+            await _eventLogWriter.WriteAsync(record, cancellationToken);
         }
 
         _logger.LogInformation("Completed workflow hello for run {RunId}", runId);

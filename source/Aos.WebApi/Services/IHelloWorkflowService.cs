@@ -9,5 +9,5 @@ public interface IHelloWorkflowService
 
 public sealed record HelloWorkflowArtifacts(
     Manifest Manifest,
-    IReadOnlyList<EventLogEntry> EventLogEntries
+    IReadOnlyList<EventLogRecord> EventLogRecords
 );

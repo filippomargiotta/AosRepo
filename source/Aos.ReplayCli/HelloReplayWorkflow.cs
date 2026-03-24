@@ -8,16 +8,20 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
 {
     public string WorkflowName => "hello";
 
-    public ReplayWorkflowArtifacts Replay(Manifest manifest, IReadOnlyList<EventLogEntry> expectedEntries)
+    public ReplayWorkflowArtifacts Replay(
+        Manifest manifest,
+        IReadOnlyList<EventLogRecord> expectedRecords,
+        IEventLogIntegrityChain eventLogIntegrityChain)
     {
-        var replayTimeSource = new ReplayTimeSource(expectedEntries.Select(entry => entry.OccurredAtUtc));
+        var replayTimeSource = new ReplayTimeSource(expectedRecords.Select(record => record.Entry.OccurredAtUtc));
         var service = new HelloWorkflowService(
             new FixedSeedProvider(manifest.Seed),
             replayTimeSource,
-            Microsoft.Extensions.Options.Options.Create(CreateOptionsFromManifest(manifest)));
+            Microsoft.Extensions.Options.Options.Create(CreateOptionsFromManifest(manifest)),
+            eventLogIntegrityChain);
 
         var artifacts = service.CreateHelloArtifacts(manifest.RunId);
-        return new ReplayWorkflowArtifacts(artifacts.Manifest, artifacts.EventLogEntries);
+        return new ReplayWorkflowArtifacts(artifacts.Manifest, artifacts.EventLogRecords);
     }
 
     private static HelloWorkflowOptions CreateOptionsFromManifest(Manifest manifest)

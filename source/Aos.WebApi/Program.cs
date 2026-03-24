@@ -24,6 +24,13 @@ builder.Services.Configure<EventLogOptions>(
 builder.Services.Configure<HelloWorkflowOptions>(
     builder.Configuration.GetSection(HelloWorkflowOptions.SectionName));
 builder.Services.AddSingleton<IEventLogWriter, FileEventLogWriter>();
+builder.Services.AddSingleton<IEventLogIntegrityChain>(serviceProvider =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<EventLogOptions>>()
+        .Value;
+    return new HmacEventLogIntegrityChain(options.HmacKey, options.HmacKeyId);
+});
 builder.Services.AddSingleton<ISeedGenerator, RandomSeedGenerator>();
 builder.Services.AddSingleton<ISeedProvider, LockedSeedProvider>();
 builder.Services.AddSingleton<ITimeSource, SystemTimeSource>();

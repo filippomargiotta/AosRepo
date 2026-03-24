@@ -27,7 +27,7 @@ public sealed class FileEventLogWriter : IEventLogWriter
         _logger = logger;
     }
 
-    public async Task WriteAsync(EventLogEntry entry, CancellationToken cancellationToken = default)
+    public async Task WriteAsync(EventLogRecord record, CancellationToken cancellationToken = default)
     {
         var directory = Path.Combine(_rootPath, _options.Directory);
         Directory.CreateDirectory(directory);
@@ -35,14 +35,14 @@ public sealed class FileEventLogWriter : IEventLogWriter
         var path = Path.Combine(directory, _options.FileName);
         _logger.LogInformation(
             "Writing event log entry {EventType} for run {RunId} to {Path}",
-            entry.EventType,
-            entry.RunId,
+            record.Entry.EventType,
+            record.Entry.RunId,
             path);
-        var json = JsonSerializer.Serialize(entry, JsonOptions);
+        var json = JsonSerializer.Serialize(record, JsonOptions);
         await File.AppendAllTextAsync(path, json + Environment.NewLine, Encoding.UTF8, cancellationToken);
         _logger.LogInformation(
             "Wrote event log entry {EventType} for run {RunId}",
-            entry.EventType,
-            entry.RunId);
+            record.Entry.EventType,
+            record.Entry.RunId);
     }
 }

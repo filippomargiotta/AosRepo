@@ -7,4 +7,8 @@ public sealed class EventLogOptions
     public string Directory { get; set; } = "data";
 
     public string FileName { get; set; } = "eventlog.jsonl";
+
+    public string HmacKey { get; set; } = "local-dev-hmac-key";
+
+    public string HmacKeyId { get; set; } = "local-dev";
 }

@@ -8,6 +8,9 @@ namespace Aos.WebApi.Tests;
 
 public sealed class HelloWorkflowServiceTests
 {
+    private const string TestHmacKey = "test-hmac-key";
+    private const string TestHmacKeyId = "test-key";
+
     [Fact]
     public void CreateHelloArtifacts_UsesConfiguredModelsToolsAndPolicies()
     {
@@ -44,7 +47,8 @@ public sealed class HelloWorkflowServiceTests
                         Reason = "configured default policy"
                     }
                 ]
-            }));
+            }),
+            CreateIntegrityChain());
 
         var artifacts = service.CreateHelloArtifacts("run-1");
 
@@ -53,6 +57,7 @@ public sealed class HelloWorkflowServiceTests
         Assert.Equal(
             new[] { new PolicyDecision("allow-approved-tools", "allow", "configured default policy") },
             artifacts.Manifest.PolicyDecisions);
+        Assert.Equal(SchemaVersions.CurrentEventLogSchemaVersion, artifacts.EventLogRecords.Single().SchemaVersion);
     }
 
     [Fact]
@@ -115,8 +120,12 @@ public sealed class HelloWorkflowServiceTests
             new FixedTimeSource(
                 new DateTimeOffset(2026, 2, 26, 20, 30, 0, TimeSpan.Zero),
                 new TimeSourceInfo("record", "stub", "clock-1", "utc-millis", null)),
-            Microsoft.Extensions.Options.Options.Create(options));
+            Microsoft.Extensions.Options.Options.Create(options),
+            CreateIntegrityChain());
     }
+
+    private static IEventLogIntegrityChain CreateIntegrityChain() =>
+        new HmacEventLogIntegrityChain(TestHmacKey, TestHmacKeyId);
 
     private sealed class FixedSeedProvider : ISeedProvider
     {
