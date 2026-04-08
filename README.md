@@ -40,4 +40,24 @@ dotnet run --project source/Aos.ReplayCli -- \
 
 Expected result: exit code `0` and a per-scenario PASS summary.
 
+## Router API
+
+The API also exposes a deterministic router decision endpoint backed by configured model candidates and weighted routing scores.
+
+Sample request:
+
+```bash
+curl -X POST http://localhost:5057/router/decide \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "taskClass": "chat.response",
+    "maxLatencyMs": 200,
+    "maxCostPer1KTokens": 0.5,
+    "minQualityScore": 60,
+    "requiredComplianceTags": ["eu", "standard"]
+  }'
+```
+
+Expected result: a ranked deterministic routing decision with the selected model and any rejected candidates.
+
 Current schema/versioning rules for replay artifacts are documented in `project/SchemaVersioning.md`.

@@ -4,3 +4,16 @@ POST {{Aos.WebApi_HostAddress}}/workflow/hello
 Accept: application/json
 
 ###
+
+POST {{Aos.WebApi_HostAddress}}/router/decide
+Content-Type: application/json
+
+{
+  "taskClass": "chat.response",
+  "maxLatencyMs": 200,
+  "maxCostPer1KTokens": 0.5,
+  "minQualityScore": 60,
+  "requiredComplianceTags": ["eu", "standard"]
+}
+
+###

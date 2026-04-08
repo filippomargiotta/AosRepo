@@ -23,6 +23,8 @@ builder.Services.Configure<EventLogOptions>(
     builder.Configuration.GetSection(EventLogOptions.SectionName));
 builder.Services.Configure<HelloWorkflowOptions>(
     builder.Configuration.GetSection(HelloWorkflowOptions.SectionName));
+builder.Services.Configure<RouterOptions>(
+    builder.Configuration.GetSection(RouterOptions.SectionName));
 builder.Services.AddSingleton<IEventLogWriter, FileEventLogWriter>();
 builder.Services.AddSingleton<IManifestWriter, FileManifestWriter>();
 builder.Services.AddSingleton<IEventLogIntegrityChain>(serviceProvider =>
@@ -43,6 +45,7 @@ builder.Services.AddSingleton<ISeedGenerator, RandomSeedGenerator>();
 builder.Services.AddSingleton<ISeedProvider, LockedSeedProvider>();
 builder.Services.AddSingleton<ITimeSource, SystemTimeSource>();
 builder.Services.AddSingleton<IHelloWorkflowService, HelloWorkflowService>();
+builder.Services.AddSingleton<IRouterService, DeterministicRouterService>();
 
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracerProviderBuilder =>

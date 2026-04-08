@@ -1,0 +1,190 @@
+using Aos.WebApi.Models;
+using Aos.WebApi.Options;
+using Aos.WebApi.Services;
+using Xunit;
+
+namespace Aos.WebApi.Tests;
+
+public sealed class RouterServiceTests
+{
+    [Fact]
+    public void SelectModel_ReturnsHighestScoringEligibleCandidate()
+    {
+        var service = CreateService(CreateDefaultOptions());
+
+        var result = service.SelectModel(new RouterSelectionRequest(
+            TaskClass: "chat.response",
+            MaxLatencyMs: 220,
+            MaxCostPer1KTokens: 0.5m,
+            MinQualityScore: 60,
+            RequiredComplianceTags: ["eu", "standard"]));
+
+        Assert.NotNull(result.SelectedCandidate);
+        Assert.Equal("openai-gpt-4.1-mini", result.SelectedCandidate!.ModelId);
+        Assert.Single(result.RankedCandidates);
+        Assert.NotEmpty(result.RejectionReasons);
+    }
+
+    [Fact]
+    public void SelectModel_FiltersCandidatesUsingDeterministicConstraints()
+    {
+        var service = CreateService(CreateDefaultOptions());
+
+        var result = service.SelectModel(new RouterSelectionRequest(
+            TaskClass: "audited.agent",
+            MaxLatencyMs: 300,
+            MaxCostPer1KTokens: 1.0m,
+            MinQualityScore: 80,
+            RequiredComplianceTags: ["audit", "eu"]));
+
+        Assert.NotNull(result.SelectedCandidate);
+        Assert.Equal("azure-gpt-4.1", result.SelectedCandidate!.ModelId);
+        Assert.Contains(result.RejectionReasons, reason => reason.Contains("local/local-phi-mini/0.3", StringComparison.Ordinal));
+        Assert.Contains(result.RejectionReasons, reason => reason.Contains("openai/openai-gpt-4.1-mini/2026-02", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SelectModel_ReturnsStableDecisionWhenCandidateOrderChanges()
+    {
+        var request = new RouterSelectionRequest(
+            TaskClass: "chat.response",
+            MaxLatencyMs: 400,
+            MaxCostPer1KTokens: 1.0m,
+            MinQualityScore: 50,
+            RequiredComplianceTags: ["eu"]);
+
+        var forward = CreateService(CreateDefaultOptions()).SelectModel(request);
+        var reversedOptions = CreateDefaultOptions();
+        reversedOptions.Candidates.Reverse();
+        var reversed = CreateService(reversedOptions).SelectModel(request);
+
+        Assert.NotNull(forward.SelectedCandidate);
+        Assert.NotNull(reversed.SelectedCandidate);
+        Assert.Equal(forward.SelectedCandidate!.ModelId, reversed.SelectedCandidate!.ModelId);
+        Assert.Equal(forward.SelectedCandidate.Provider, reversed.SelectedCandidate.Provider);
+        Assert.Equal(forward.SelectedCandidate.Version, reversed.SelectedCandidate.Version);
+        Assert.Equal(
+            forward.RankedCandidates.Select(candidate => candidate.Candidate.ModelId),
+            reversed.RankedCandidates.Select(candidate => candidate.Candidate.ModelId));
+    }
+
+    [Fact]
+    public void SelectModel_UsesLexicalTieBreakWhenScoresAreEqual()
+    {
+        var options = new RouterOptions
+        {
+            Weights = new RouterWeightsOptions
+            {
+                Latency = 1m,
+                Cost = 1m,
+                Quality = 1m,
+                Compliance = 1m
+            },
+            Candidates =
+            [
+                new RouterModelOptions
+                {
+                    ModelId = "model-z",
+                    Provider = "openai",
+                    Version = "1",
+                    LatencyMs = 100,
+                    CostPer1KTokens = 0.1m,
+                    QualityScore = 80,
+                    ComplianceScore = 90,
+                    ComplianceTags = [ "eu" ]
+                },
+                new RouterModelOptions
+                {
+                    ModelId = "model-a",
+                    Provider = "openai",
+                    Version = "1",
+                    LatencyMs = 100,
+                    CostPer1KTokens = 0.1m,
+                    QualityScore = 80,
+                    ComplianceScore = 90,
+                    ComplianceTags = [ "eu" ]
+                }
+            ]
+        };
+
+        var result = CreateService(options).SelectModel(new RouterSelectionRequest(
+            TaskClass: "tie.break",
+            MaxLatencyMs: 200,
+            MaxCostPer1KTokens: 0.2m,
+            MinQualityScore: 70,
+            RequiredComplianceTags: ["eu"]));
+
+        Assert.NotNull(result.SelectedCandidate);
+        Assert.Equal("model-a", result.SelectedCandidate!.ModelId);
+    }
+
+    [Fact]
+    public void SelectModel_WhenNothingMatches_ReturnsRejectionsAndNoSelection()
+    {
+        var service = CreateService(CreateDefaultOptions());
+
+        var result = service.SelectModel(new RouterSelectionRequest(
+            TaskClass: "strict.offline",
+            MaxLatencyMs: 20,
+            MaxCostPer1KTokens: 0.01m,
+            MinQualityScore: 95,
+            RequiredComplianceTags: ["offline", "audit"]));
+
+        Assert.Null(result.SelectedCandidate);
+        Assert.Empty(result.RankedCandidates);
+        Assert.NotEmpty(result.RejectionReasons);
+    }
+
+    private static DeterministicRouterService CreateService(RouterOptions options)
+        => new(Microsoft.Extensions.Options.Options.Create(options));
+
+    private static RouterOptions CreateDefaultOptions()
+    {
+        return new RouterOptions
+        {
+            Weights = new RouterWeightsOptions
+            {
+                Latency = 0.35m,
+                Cost = 0.2m,
+                Quality = 0.3m,
+                Compliance = 0.15m
+            },
+            Candidates =
+            [
+                new RouterModelOptions
+                {
+                    ModelId = "openai-gpt-4.1-mini",
+                    Provider = "openai",
+                    Version = "2026-02",
+                    LatencyMs = 180,
+                    CostPer1KTokens = 0.4m,
+                    QualityScore = 82,
+                    ComplianceScore = 90,
+                    ComplianceTags = [ "standard", "eu" ]
+                },
+                new RouterModelOptions
+                {
+                    ModelId = "local-phi-mini",
+                    Provider = "local",
+                    Version = "0.3",
+                    LatencyMs = 45,
+                    CostPer1KTokens = 0.05m,
+                    QualityScore = 58,
+                    ComplianceScore = 95,
+                    ComplianceTags = [ "standard", "offline", "eu" ]
+                },
+                new RouterModelOptions
+                {
+                    ModelId = "azure-gpt-4.1",
+                    Provider = "azure-openai",
+                    Version = "2026-02",
+                    LatencyMs = 260,
+                    CostPer1KTokens = 0.9m,
+                    QualityScore = 91,
+                    ComplianceScore = 88,
+                    ComplianceTags = [ "standard", "eu", "audit" ]
+                }
+            ]
+        };
+    }
+}
