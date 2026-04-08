@@ -8,6 +8,9 @@ public interface IHelloWorkflowService
 }
 
 public sealed record HelloWorkflowArtifacts(
-    Manifest Manifest,
+    ManifestRecord ManifestRecord,
     IReadOnlyList<EventLogRecord> EventLogRecords
-);
+)
+{
+    public Manifest Manifest => ManifestRecord.Manifest;
+}

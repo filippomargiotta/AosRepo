@@ -7,10 +7,10 @@ public sealed class ReplayTimeSource : ITimeSource
     private readonly Queue<DateTimeOffset> _remainingInstants;
     private readonly TimeSourceInfo _descriptor;
 
-    public ReplayTimeSource(IEnumerable<DateTimeOffset> recordedInstants)
+    public ReplayTimeSource(IEnumerable<DateTimeOffset> recordedInstants, TimeSourceInfo? descriptor = null)
     {
         _remainingInstants = new Queue<DateTimeOffset>(recordedInstants);
-        _descriptor = new TimeSourceInfo(
+        _descriptor = descriptor ?? new TimeSourceInfo(
             Mode: "replay",
             Source: "recorded-sequence",
             ClockId: "clock-replay-1",

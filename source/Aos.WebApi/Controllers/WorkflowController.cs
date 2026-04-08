@@ -10,15 +10,18 @@ namespace Aos.WebApi.Controllers;
 public class WorkflowController : ControllerBase
 {
     private readonly IEventLogWriter _eventLogWriter;
+    private readonly IManifestWriter _manifestWriter;
     private readonly IHelloWorkflowService _helloWorkflowService;
     private readonly ILogger<WorkflowController> _logger;
 
     public WorkflowController(
         IEventLogWriter eventLogWriter,
+        IManifestWriter manifestWriter,
         IHelloWorkflowService helloWorkflowService,
         ILogger<WorkflowController> logger)
     {
         _eventLogWriter = eventLogWriter;
+        _manifestWriter = manifestWriter;
         _helloWorkflowService = helloWorkflowService;
         _logger = logger;
     }
@@ -48,6 +51,8 @@ public class WorkflowController : ControllerBase
             runId,
             artifacts.Manifest.ManifestVersion);
 
+        await _manifestWriter.WriteAsync(artifacts.ManifestRecord, cancellationToken);
+
         foreach (var record in artifacts.EventLogRecords)
         {
             await _eventLogWriter.WriteAsync(record, cancellationToken);
@@ -58,7 +63,7 @@ public class WorkflowController : ControllerBase
         return Ok(new
         {
             RunId = runId,
-            Manifest = artifacts.Manifest
+            Manifest = artifacts.ManifestRecord
         });
     }
 }

@@ -8,8 +8,15 @@ public sealed record Manifest(
     IReadOnlyList<ModelRef> Models,
     IReadOnlyList<ToolRef> Tools,
     IReadOnlyList<PolicyDecision> PolicyDecisions,
+    EventLogSummary EventLog,
     DateTimeOffset StartedAtUtc,
     DateTimeOffset? CompletedAtUtc
+);
+
+public sealed record EventLogSummary(
+    string SchemaVersion,
+    int RecordCount,
+    string LastChainMac
 );
 
 public sealed record SeedInfo(
@@ -42,4 +49,15 @@ public sealed record PolicyDecision(
     string PolicyId,
     string Decision,
     string? Reason
+);
+
+public sealed record ManifestRecord(
+    Manifest Manifest,
+    ManifestIntegrity Integrity
+);
+
+public sealed record ManifestIntegrity(
+    string Algorithm,
+    string KeyId,
+    string ManifestMac
 );

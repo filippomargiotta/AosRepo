@@ -29,7 +29,7 @@ public sealed class FileEventLogWriter : IEventLogWriter
 
     public async Task WriteAsync(EventLogRecord record, CancellationToken cancellationToken = default)
     {
-        var directory = Path.Combine(_rootPath, _options.Directory);
+        var directory = Path.Combine(_rootPath, _options.Directory, record.Entry.RunId);
         Directory.CreateDirectory(directory);
 
         var path = Path.Combine(directory, _options.FileName);

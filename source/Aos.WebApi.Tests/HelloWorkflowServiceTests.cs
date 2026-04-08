@@ -48,7 +48,8 @@ public sealed class HelloWorkflowServiceTests
                     }
                 ]
             }),
-            CreateIntegrityChain());
+            CreateIntegrityChain(),
+            CreateManifestSigner());
 
         var artifacts = service.CreateHelloArtifacts("run-1");
 
@@ -58,6 +59,10 @@ public sealed class HelloWorkflowServiceTests
             new[] { new PolicyDecision("allow-approved-tools", "allow", "configured default policy") },
             artifacts.Manifest.PolicyDecisions);
         Assert.Equal(SchemaVersions.CurrentEventLogSchemaVersion, artifacts.EventLogRecords.Single().SchemaVersion);
+        Assert.Equal(1, artifacts.Manifest.EventLog.RecordCount);
+        Assert.Equal(artifacts.EventLogRecords.Single().Integrity.ChainMac, artifacts.Manifest.EventLog.LastChainMac);
+        Assert.True(CreateManifestSigner().TryValidateRecord(artifacts.ManifestRecord, out var error));
+        Assert.Null(error);
     }
 
     [Fact]
@@ -121,11 +126,15 @@ public sealed class HelloWorkflowServiceTests
                 new DateTimeOffset(2026, 2, 26, 20, 30, 0, TimeSpan.Zero),
                 new TimeSourceInfo("record", "stub", "clock-1", "utc-millis", null)),
             Microsoft.Extensions.Options.Options.Create(options),
-            CreateIntegrityChain());
+            CreateIntegrityChain(),
+            CreateManifestSigner());
     }
 
     private static IEventLogIntegrityChain CreateIntegrityChain() =>
         new HmacEventLogIntegrityChain(TestHmacKey, TestHmacKeyId);
+
+    private static IManifestSigner CreateManifestSigner() =>
+        new HmacManifestSigner(TestHmacKey, TestHmacKeyId);
 
     private sealed class FixedSeedProvider : ISeedProvider
     {

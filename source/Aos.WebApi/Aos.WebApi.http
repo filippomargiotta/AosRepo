@@ -1,6 +1,6 @@
 @Aos.WebApi_HostAddress = http://localhost:5057
 
-GET {{Aos.WebApi_HostAddress}}/weatherforecast/
+POST {{Aos.WebApi_HostAddress}}/workflow/hello
 Accept: application/json
 
 ###

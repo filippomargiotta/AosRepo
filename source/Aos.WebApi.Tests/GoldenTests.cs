@@ -42,39 +42,37 @@ public sealed class GoldenTests
             new FixedSeedProvider(GoldenSeed),
             recordTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
-            CreateIntegrityChain());
+            CreateIntegrityChain(),
+            CreateManifestSigner());
 
         var artifacts = service.CreateHelloArtifacts(GoldenRunId);
 
         Assert.Equal([GoldenInstant], recordTimeSource.GetRecordedInstants());
-        Assert.Equal(ReadGoldenManifestJson(), SerializeManifest(artifacts.Manifest));
+        Assert.Equal(ReadGoldenManifestJson(), SerializeManifestRecord(artifacts.ManifestRecord));
         Assert.Equal(ReadGoldenEventLogJsonl(), SerializeEventLogLines(artifacts.EventLogRecords));
     }
 
     [Fact]
     public void ReplayHelloWorkflow_FromGoldenArtifacts_ReproducesDeterministicOutput()
     {
-        var goldenManifest = ReadGoldenManifest();
+        var goldenManifestRecord = ReadGoldenManifestRecord();
         var goldenEventLogRecords = ReadGoldenEventLogRecords();
 
-        var replayTimeSource = new ReplayTimeSource([goldenManifest.StartedAtUtc]);
+        var replayTimeSource = new ReplayTimeSource(
+            [goldenManifestRecord.Manifest.StartedAtUtc],
+            goldenManifestRecord.Manifest.TimeSource);
         var service = new HelloWorkflowService(
-            new FixedSeedProvider(goldenManifest.Seed),
+            new FixedSeedProvider(goldenManifestRecord.Manifest.Seed),
             replayTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
-            CreateIntegrityChain());
+            CreateIntegrityChain(),
+            CreateManifestSigner());
 
-        var replayed = service.CreateHelloArtifacts(goldenManifest.RunId);
+        var replayed = service.CreateHelloArtifacts(goldenManifestRecord.Manifest.RunId);
 
-        Assert.Equal(goldenManifest.ManifestVersion, replayed.Manifest.ManifestVersion);
-        Assert.Equal(goldenManifest.RunId, replayed.Manifest.RunId);
-        Assert.Equal(goldenManifest.Seed, replayed.Manifest.Seed);
-        Assert.Equal(goldenManifest.Models, replayed.Manifest.Models);
-        Assert.Equal(goldenManifest.Tools, replayed.Manifest.Tools);
-        Assert.Equal(goldenManifest.PolicyDecisions, replayed.Manifest.PolicyDecisions);
-        Assert.Equal(goldenManifest.StartedAtUtc, replayed.Manifest.StartedAtUtc);
-        Assert.Equal(goldenManifest.CompletedAtUtc, replayed.Manifest.CompletedAtUtc);
-        Assert.Equal("replay", replayed.Manifest.TimeSource.Mode);
+        Assert.Equal(
+            SerializeManifestRecord(goldenManifestRecord),
+            SerializeManifestRecord(replayed.ManifestRecord));
 
         Assert.Equal(
             SerializeEventLogLines(goldenEventLogRecords),
@@ -86,11 +84,11 @@ public sealed class GoldenTests
 
     private static string ReadGoldenEventLogJsonl() => File.ReadAllText(Path.Combine(GetGoldenDir(), "eventlog.jsonl"));
 
-    private static Manifest ReadGoldenManifest()
+    private static ManifestRecord ReadGoldenManifestRecord()
     {
-        var manifest = JsonSerializer.Deserialize<Manifest>(ReadGoldenManifestJson(), JsonOptions);
-        Assert.NotNull(manifest);
-        return manifest!;
+        var manifestRecord = JsonSerializer.Deserialize<ManifestRecord>(ReadGoldenManifestJson(), JsonOptions);
+        Assert.NotNull(manifestRecord);
+        return manifestRecord!;
     }
 
     private static IReadOnlyList<EventLogRecord> ReadGoldenEventLogRecords()
@@ -107,7 +105,8 @@ public sealed class GoldenTests
         return records;
     }
 
-    private static string SerializeManifest(Manifest manifest) => JsonSerializer.Serialize(manifest, JsonOptions);
+    private static string SerializeManifestRecord(ManifestRecord manifestRecord) =>
+        JsonSerializer.Serialize(manifestRecord, JsonOptions);
 
     private static string SerializeEventLogLines(IEnumerable<EventLogRecord> records)
     {
@@ -123,6 +122,9 @@ public sealed class GoldenTests
 
     private static IEventLogIntegrityChain CreateIntegrityChain() =>
         new HmacEventLogIntegrityChain(GoldenHmacKey, GoldenHmacKeyId);
+
+    private static IManifestSigner CreateManifestSigner() =>
+        new HmacManifestSigner(GoldenHmacKey, GoldenHmacKeyId);
 
     private static string GetGoldenDir() => Path.GetFullPath(Path.Combine(
         AppContext.BaseDirectory,

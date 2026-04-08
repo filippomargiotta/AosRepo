@@ -129,6 +129,26 @@ public static class ManifestValidator
             }
         }
 
+        if (string.IsNullOrWhiteSpace(manifest.EventLog.SchemaVersion))
+        {
+            errors.Add("EventLog.SchemaVersion is required.");
+        }
+        else if (!SchemaVersions.IsSupportedEventLogSchemaVersion(manifest.EventLog.SchemaVersion))
+        {
+            errors.Add(
+                $"EventLog.SchemaVersion '{manifest.EventLog.SchemaVersion}' is not supported. Supported version: {SchemaVersions.CurrentEventLogSchemaVersion}.");
+        }
+
+        if (manifest.EventLog.RecordCount <= 0)
+        {
+            errors.Add("EventLog.RecordCount must be greater than zero.");
+        }
+
+        if (string.IsNullOrWhiteSpace(manifest.EventLog.LastChainMac))
+        {
+            errors.Add("EventLog.LastChainMac is required.");
+        }
+
         if (manifest.CompletedAtUtc is not null &&
             manifest.CompletedAtUtc.Value < manifest.StartedAtUtc)
         {

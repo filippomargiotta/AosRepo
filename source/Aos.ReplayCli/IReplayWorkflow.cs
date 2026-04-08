@@ -10,10 +10,14 @@ internal interface IReplayWorkflow
     ReplayWorkflowArtifacts Replay(
         Manifest manifest,
         IReadOnlyList<EventLogRecord> expectedRecords,
-        IEventLogIntegrityChain eventLogIntegrityChain);
+        IEventLogIntegrityChain eventLogIntegrityChain,
+        IManifestSigner manifestSigner);
 }
 
 internal sealed record ReplayWorkflowArtifacts(
-    Manifest Manifest,
+    ManifestRecord ManifestRecord,
     IReadOnlyList<EventLogRecord> EventLogRecords
-);
+)
+{
+    public Manifest Manifest => ManifestRecord.Manifest;
+}

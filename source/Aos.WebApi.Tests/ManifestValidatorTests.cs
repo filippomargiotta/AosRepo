@@ -10,7 +10,7 @@ public sealed class ManifestValidatorTests
     {
         var now = DateTimeOffset.UtcNow;
         var manifest = new Manifest(
-            ManifestVersion: "0.1",
+            ManifestVersion: SchemaVersions.CurrentManifestVersion,
             RunId: "run-1",
             Seed: new SeedInfo(
                 SeedId: "seed-1",
@@ -26,6 +26,7 @@ public sealed class ManifestValidatorTests
             Models: new[] { new ModelRef("model-1", "local", "0.0") },
             Tools: new[] { new ToolRef("tool-1", "0.0") },
             PolicyDecisions: new[] { new PolicyDecision("policy-1", "allow", null) },
+            EventLog: new EventLogSummary(SchemaVersions.CurrentEventLogSchemaVersion, 1, "chain-mac-1"),
             StartedAtUtc: now,
             CompletedAtUtc: now);
 
@@ -54,6 +55,7 @@ public sealed class ManifestValidatorTests
             Models: Array.Empty<ModelRef>(),
             Tools: Array.Empty<ToolRef>(),
             PolicyDecisions: Array.Empty<PolicyDecision>(),
+            EventLog: new EventLogSummary("", 0, ""),
             StartedAtUtc: DateTimeOffset.UtcNow,
             CompletedAtUtc: null);
 
@@ -67,20 +69,21 @@ public sealed class ManifestValidatorTests
     {
         var now = DateTimeOffset.UtcNow;
         var manifest = new Manifest(
-            ManifestVersion: "0.2",
+            ManifestVersion: "0.1",
             RunId: "run-1",
             Seed: new SeedInfo("seed-1", "xoroshiro128**", 123, "static test"),
             TimeSource: new TimeSourceInfo("record", "system-utc", "clock-1", "utc-millis", null),
             Models: new[] { new ModelRef("model-1", "local", "0.0") },
             Tools: new[] { new ToolRef("tool-1", "0.0") },
             PolicyDecisions: new[] { new PolicyDecision("policy-1", "allow", null) },
+            EventLog: new EventLogSummary(SchemaVersions.CurrentEventLogSchemaVersion, 1, "chain-mac-1"),
             StartedAtUtc: now,
             CompletedAtUtc: now);
 
         var errors = ManifestValidator.Validate(manifest);
 
         Assert.Contains(
-            "ManifestVersion '0.2' is not supported. Supported version: 0.1.",
+            "ManifestVersion '0.1' is not supported. Supported version: 0.2.",
             errors);
     }
 
@@ -96,6 +99,7 @@ public sealed class ManifestValidatorTests
             Models: new[] { new ModelRef("", "", "") },
             Tools: new[] { new ToolRef("", "") },
             PolicyDecisions: new[] { new PolicyDecision("", "maybe", null) },
+            EventLog: new EventLogSummary("", 0, ""),
             StartedAtUtc: now,
             CompletedAtUtc: now);
 
@@ -108,5 +112,8 @@ public sealed class ManifestValidatorTests
         Assert.Contains("Tools[0].Version is required.", errors);
         Assert.Contains("PolicyDecisions[0].PolicyId is required.", errors);
         Assert.Contains("PolicyDecisions[0].Decision must be 'allow' or 'deny'.", errors);
+        Assert.Contains("EventLog.SchemaVersion is required.", errors);
+        Assert.Contains("EventLog.RecordCount must be greater than zero.", errors);
+        Assert.Contains("EventLog.LastChainMac is required.", errors);
     }
 }

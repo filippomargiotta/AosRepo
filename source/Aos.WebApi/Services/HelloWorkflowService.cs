@@ -10,17 +10,20 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
     private readonly ITimeSource _timeSource;
     private readonly HelloWorkflowOptions _options;
     private readonly IEventLogIntegrityChain _eventLogIntegrityChain;
+    private readonly IManifestSigner _manifestSigner;
 
     public HelloWorkflowService(
         ISeedProvider seedProvider,
         ITimeSource timeSource,
         IOptions<HelloWorkflowOptions> options,
-        IEventLogIntegrityChain eventLogIntegrityChain)
+        IEventLogIntegrityChain eventLogIntegrityChain,
+        IManifestSigner manifestSigner)
     {
         _seedProvider = seedProvider;
         _timeSource = timeSource;
         _options = options.Value;
         _eventLogIntegrityChain = eventLogIntegrityChain;
+        _manifestSigner = manifestSigner;
     }
 
     public HelloWorkflowArtifacts CreateHelloArtifacts(string runId)
@@ -37,6 +40,13 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
         var tools = ResolveTools();
         var policyDecisions = ResolvePolicyDecisions();
 
+        var entry = new EventLogEntry(
+            RunId: runId,
+            EventType: "workflow.hello",
+            Data: new { Message = "hello", ManifestVersion = SchemaVersions.CurrentManifestVersion },
+            OccurredAtUtc: now);
+
+        var eventLogRecords = _eventLogIntegrityChain.SignEntries([entry]);
         var manifest = new Manifest(
             ManifestVersion: SchemaVersions.CurrentManifestVersion,
             RunId: runId,
@@ -45,6 +55,7 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
             Models: models,
             Tools: tools,
             PolicyDecisions: policyDecisions,
+            EventLog: BuildEventLogSummary(eventLogRecords),
             StartedAtUtc: now,
             CompletedAtUtc: now);
 
@@ -54,15 +65,22 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
             throw new InvalidOperationException(string.Join(" ", manifestErrors));
         }
 
-        var entry = new EventLogEntry(
-            RunId: runId,
-            EventType: "workflow.hello",
-            Data: new { Message = "hello", ManifestVersion = manifest.ManifestVersion },
-            OccurredAtUtc: now);
-
         return new HelloWorkflowArtifacts(
-            Manifest: manifest,
-            EventLogRecords: _eventLogIntegrityChain.SignEntries([entry]));
+            ManifestRecord: _manifestSigner.SignManifest(manifest),
+            EventLogRecords: eventLogRecords);
+    }
+
+    private static EventLogSummary BuildEventLogSummary(IReadOnlyList<EventLogRecord> eventLogRecords)
+    {
+        if (eventLogRecords.Count == 0)
+        {
+            throw new InvalidOperationException("Hello workflow must emit at least one event-log record.");
+        }
+
+        return new EventLogSummary(
+            SchemaVersion: eventLogRecords[0].SchemaVersion,
+            RecordCount: eventLogRecords.Count,
+            LastChainMac: eventLogRecords[^1].Integrity.ChainMac);
     }
 
     private IReadOnlyList<ModelRef> ResolveModels()

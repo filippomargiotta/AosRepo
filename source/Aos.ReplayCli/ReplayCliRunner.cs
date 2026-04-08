@@ -7,7 +7,6 @@ namespace Aos.ReplayCli;
 
 public static class ReplayCliRunner
 {
-    private const string IgnoredManifestField = "timeSource";
     private static readonly IReadOnlyDictionary<string, IReplayWorkflow> Workflows =
         new IReplayWorkflow[] { new HelloReplayWorkflow() }
             .ToDictionary(workflow => workflow.WorkflowName, StringComparer.OrdinalIgnoreCase);
@@ -33,13 +32,24 @@ public static class ReplayCliRunner
 
         try
         {
-            var manifest = await LoadManifestAsync(request.ManifestPath, cancellationToken);
+            var manifestRecord = await LoadManifestRecordAsync(request.ManifestPath, cancellationToken);
             var expectedRecords = await LoadEventLogRecordsAsync(request.EventLogPath, cancellationToken);
+            var manifest = manifestRecord.Manifest;
 
             var manifestErrors = ManifestValidator.Validate(manifest);
             if (manifestErrors.Count > 0)
             {
                 await stderr.WriteLineAsync($"Manifest validation failed: {string.Join(" ", manifestErrors)}");
+                return 1;
+            }
+
+            var manifestSigner = new HmacManifestSigner(
+                request.HmacKey,
+                manifestRecord.Integrity.KeyId);
+
+            if (!manifestSigner.TryValidateRecord(manifestRecord, out var manifestIntegrityError))
+            {
+                await stderr.WriteLineAsync($"Artifact integrity failed: {manifestIntegrityError}");
                 return 1;
             }
 
@@ -77,8 +87,8 @@ public static class ReplayCliRunner
                 return 2;
             }
 
-            var actual = workflow.Replay(manifest, expectedRecords, eventLogIntegrityChain);
-            var mismatches = GetDeterministicManifestMismatches(manifest, actual.Manifest);
+            var actual = workflow.Replay(manifest, expectedRecords, eventLogIntegrityChain, manifestSigner);
+            var mismatches = GetManifestRecordMismatches(manifestRecord, actual.ManifestRecord);
             var eventLogMismatches = GetEventLogMismatches(
                 expectedRecords.Select(record => record.Entry).ToArray(),
                 actual.EventLogRecords.Select(record => record.Entry).ToArray());
@@ -140,6 +150,7 @@ public static class ReplayCliRunner
         }
 
         string? workflowName = null;
+        string? artifactDir = null;
         string? manifestPath = null;
         string? eventLogPath = null;
         string? hmacKey = null;
@@ -150,6 +161,9 @@ public static class ReplayCliRunner
             {
                 case "--workflow" when i + 1 < args.Length:
                     workflowName = args[++i];
+                    break;
+                case "--artifact-dir" when i + 1 < args.Length:
+                    artifactDir = args[++i];
                     break;
                 case "--manifest" when i + 1 < args.Length:
                     manifestPath = args[++i];
@@ -166,12 +180,24 @@ public static class ReplayCliRunner
             }
         }
 
+        if (!string.IsNullOrWhiteSpace(artifactDir))
+        {
+            if (!string.IsNullOrWhiteSpace(manifestPath) || !string.IsNullOrWhiteSpace(eventLogPath))
+            {
+                error = "Use either --artifact-dir or the explicit --manifest/--eventlog paths, not both.";
+                return false;
+            }
+
+            manifestPath = Path.Combine(artifactDir, "manifest.json");
+            eventLogPath = Path.Combine(artifactDir, "eventlog.jsonl");
+        }
+
         if (string.IsNullOrWhiteSpace(workflowName) ||
             string.IsNullOrWhiteSpace(manifestPath) ||
             string.IsNullOrWhiteSpace(eventLogPath) ||
             string.IsNullOrWhiteSpace(hmacKey))
         {
-            error = "The --workflow, --manifest, --eventlog, and --hmac-key arguments are required.";
+            error = "The --workflow, --hmac-key, and either --artifact-dir or both --manifest/--eventlog arguments are required.";
             return false;
         }
 
@@ -179,16 +205,16 @@ public static class ReplayCliRunner
         return true;
     }
 
-    private static async Task<Manifest> LoadManifestAsync(string path, CancellationToken cancellationToken)
+    private static async Task<ManifestRecord> LoadManifestRecordAsync(string path, CancellationToken cancellationToken)
     {
         var json = await File.ReadAllTextAsync(path, cancellationToken);
-        var manifest = JsonSerializer.Deserialize<Manifest>(json, JsonOptions);
-        if (manifest is null)
+        var manifestRecord = JsonSerializer.Deserialize<ManifestRecord>(json, JsonOptions);
+        if (manifestRecord is null)
         {
             throw new JsonException("Manifest JSON deserialized to null.");
         }
 
-        return manifest;
+        return manifestRecord;
     }
 
     private static async Task<IReadOnlyList<EventLogRecord>> LoadEventLogRecordsAsync(
@@ -212,15 +238,14 @@ public static class ReplayCliRunner
         return records;
     }
 
-    private static List<string> GetDeterministicManifestMismatches(Manifest expected, Manifest actual)
+    private static List<string> GetManifestRecordMismatches(ManifestRecord expected, ManifestRecord actual)
     {
         var differences = new List<JsonDifference>();
         AddJsonDifferences(
             JsonSerializer.SerializeToElement(expected, JsonOptions),
             JsonSerializer.SerializeToElement(actual, JsonOptions),
             path: string.Empty,
-            differences,
-            new HashSet<string>(StringComparer.Ordinal) { IgnoredManifestField });
+            differences);
 
         return differences
             .Select(difference => $"Manifest field {FormatFieldPath(difference.Path)} differs: {difference.Message}.")
@@ -272,6 +297,25 @@ public static class ReplayCliRunner
     {
         var errors = new List<string>();
 
+        if (!string.Equals(manifest.EventLog.SchemaVersion, eventLogRecords[0].SchemaVersion, StringComparison.Ordinal))
+        {
+            errors.Add(
+                $"Manifest eventLog schemaVersion '{manifest.EventLog.SchemaVersion}' does not match event log schemaVersion '{eventLogRecords[0].SchemaVersion}'.");
+        }
+
+        if (manifest.EventLog.RecordCount != eventLogRecords.Count)
+        {
+            errors.Add(
+                $"Manifest eventLog recordCount '{manifest.EventLog.RecordCount}' does not match event log line count '{eventLogRecords.Count}'.");
+        }
+
+        var actualLastChainMac = eventLogRecords[^1].Integrity.ChainMac;
+        if (!string.Equals(manifest.EventLog.LastChainMac, actualLastChainMac, StringComparison.Ordinal))
+        {
+            errors.Add(
+                $"Manifest eventLog lastChainMac '{manifest.EventLog.LastChainMac}' does not match event log tail chainMac '{actualLastChainMac}'.");
+        }
+
         for (var i = 0; i < eventLogRecords.Count; i++)
         {
             var entry = eventLogRecords[i].Entry;
@@ -321,8 +365,7 @@ public static class ReplayCliRunner
         JsonElement expected,
         JsonElement actual,
         string path,
-        ICollection<JsonDifference> differences,
-        IReadOnlySet<string>? ignoredRootProperties = null)
+        ICollection<JsonDifference> differences)
     {
         if (expected.ValueKind != actual.ValueKind)
         {
@@ -335,7 +378,7 @@ public static class ReplayCliRunner
         switch (expected.ValueKind)
         {
             case JsonValueKind.Object:
-                CompareObjectProperties(expected, actual, path, differences, ignoredRootProperties);
+                CompareObjectProperties(expected, actual, path, differences);
                 break;
             case JsonValueKind.Array:
                 CompareArrayItems(expected, actual, path, differences);
@@ -360,8 +403,7 @@ public static class ReplayCliRunner
         JsonElement expected,
         JsonElement actual,
         string path,
-        ICollection<JsonDifference> differences,
-        IReadOnlySet<string>? ignoredRootProperties)
+        ICollection<JsonDifference> differences)
     {
         var expectedProperties = expected.EnumerateObject()
             .ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
@@ -370,11 +412,6 @@ public static class ReplayCliRunner
 
         foreach (var propertyName in expectedProperties.Keys.Union(actualProperties.Keys).OrderBy(name => name, StringComparer.Ordinal))
         {
-            if (path.Length == 0 && ignoredRootProperties?.Contains(propertyName) == true)
-            {
-                continue;
-            }
-
             var childPath = JoinPath(path, propertyName);
             var hasExpected = expectedProperties.TryGetValue(propertyName, out var expectedValue);
             var hasActual = actualProperties.TryGetValue(propertyName, out var actualValue);
@@ -459,7 +496,11 @@ public static class ReplayCliRunner
 
     private static string GetUsageText()
     {
-        return $"Usage: aos-replay --workflow <name> --manifest <path> --eventlog <path> --hmac-key <value>{Environment.NewLine}Available workflows: {string.Join(", ", GetWorkflowNames())}";
+        return
+            $"Usage: aos-replay --workflow <name> --manifest <path> --eventlog <path> --hmac-key <value>{Environment.NewLine}" +
+            $"   or: aos-replay --workflow <name> --artifact-dir <path> --hmac-key <value>{Environment.NewLine}" +
+            $"Exit codes: 0=verified, 1=integrity/compatibility/mismatch failure, 2=usage/input failure{Environment.NewLine}" +
+            $"Available workflows: {string.Join(", ", GetWorkflowNames())}";
     }
 
     private static IEnumerable<string> GetWorkflowNames() => Workflows.Keys.OrderBy(name => name, StringComparer.Ordinal);
