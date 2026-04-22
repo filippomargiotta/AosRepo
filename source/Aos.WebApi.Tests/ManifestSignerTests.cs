@@ -45,8 +45,32 @@ public sealed class ManifestSignerTests
             Models: [new ModelRef("model-1", "local", "0.0")],
             Tools: [new ToolRef("tool-1", "0.0")],
             PolicyDecisions: [new PolicyDecision("policy-1", "allow", null)],
+            RoutingDecisions: [CreateRoutingDecision()],
             EventLog: new EventLogSummary(SchemaVersions.CurrentEventLogSchemaVersion, 1, "chain-mac-1"),
             StartedAtUtc: now,
             CompletedAtUtc: now);
+    }
+
+    private static RouterSelectionResult CreateRoutingDecision()
+    {
+        var candidate = new RouterModelCandidate(
+            ModelId: "model-1",
+            Provider: "local",
+            Version: "0.0",
+            LatencyMs: 10,
+            CostPer1KTokens: 0.01m,
+            QualityScore: 80,
+            ComplianceScore: 90,
+            ComplianceTags: [ "standard" ]);
+
+        return new RouterSelectionResult(
+            TaskClass: "workflow.hello",
+            Policy: new RouterSelectionPolicy(
+                PolicyId: "test-policy",
+                EffectiveConstraints: new RouterSelectionConstraints(100, 0.1m, 70, [ "standard" ]),
+                EffectiveWeights: new RouterSelectionWeights(0.25m, 0.25m, 0.25m, 0.25m)),
+            SelectedCandidate: candidate,
+            RankedCandidates: [new RouterCandidateScore(candidate, 0.9m)],
+            RejectionReasons: []);
     }
 }

@@ -8,6 +8,7 @@ public sealed record Manifest(
     IReadOnlyList<ModelRef> Models,
     IReadOnlyList<ToolRef> Tools,
     IReadOnlyList<PolicyDecision> PolicyDecisions,
+    IReadOnlyList<RouterSelectionResult> RoutingDecisions,
     EventLogSummary EventLog,
     DateTimeOffset StartedAtUtc,
     DateTimeOffset? CompletedAtUtc

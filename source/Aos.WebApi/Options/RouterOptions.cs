@@ -7,6 +7,8 @@ public sealed class RouterOptions
     public RouterWeightsOptions Weights { get; set; } = new();
 
     public List<RouterModelOptions> Candidates { get; set; } = [];
+
+    public List<RouterPolicyOptions> Policies { get; set; } = [];
 }
 
 public sealed class RouterWeightsOptions
@@ -37,4 +39,21 @@ public sealed class RouterModelOptions
     public int ComplianceScore { get; set; }
 
     public List<string> ComplianceTags { get; set; } = [];
+}
+
+public sealed class RouterPolicyOptions
+{
+    public string PolicyId { get; set; } = string.Empty;
+
+    public string TaskClass { get; set; } = string.Empty;
+
+    public int? MaxLatencyMs { get; set; }
+
+    public decimal? MaxCostPer1KTokens { get; set; }
+
+    public int? MinQualityScore { get; set; }
+
+    public List<string> RequiredComplianceTags { get; set; } = [];
+
+    public RouterWeightsOptions? Weights { get; set; }
 }

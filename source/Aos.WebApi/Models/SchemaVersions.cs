@@ -2,7 +2,7 @@ namespace Aos.WebApi.Models;
 
 public static class SchemaVersions
 {
-    public const string CurrentManifestVersion = "0.2";
+    public const string CurrentManifestVersion = "0.3";
     public const string CurrentEventLogSchemaVersion = "0.2";
 
     public static bool IsSupportedManifestVersion(string manifestVersion)

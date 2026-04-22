@@ -12,7 +12,7 @@ public sealed class HelloWorkflowServiceTests
     private const string TestHmacKeyId = "test-key";
 
     [Fact]
-    public void CreateHelloArtifacts_UsesConfiguredModelsToolsAndPolicies()
+    public void CreateHelloArtifacts_UsesRouterSelectedModelAndConfiguredToolsAndPolicies()
     {
         var service = new HelloWorkflowService(
             new FixedSeedProvider(new SeedInfo("seed-run-1", "test", 123, "test")),
@@ -21,13 +21,21 @@ public sealed class HelloWorkflowServiceTests
                 new TimeSourceInfo("record", "stub", "clock-1", "utc-millis", null)),
             Microsoft.Extensions.Options.Options.Create(new HelloWorkflowOptions
             {
+                Routing = new HelloWorkflowRoutingOptions
+                {
+                    TaskClass = "workflow.hello",
+                    MaxLatencyMs = 220,
+                    MaxCostPer1KTokens = 0.5m,
+                    MinQualityScore = 60,
+                    RequiredComplianceTags = [ "eu", "standard" ]
+                },
                 Models =
                 [
                     new HelloWorkflowModelOptions
                     {
-                        ModelId = "openai-gpt-4.1-mini",
+                        ModelId = "unused-configured-model",
                         Provider = "openai",
-                        Version = "2026-02"
+                        Version = "unused"
                     }
                 ],
                 Tools =
@@ -48,12 +56,16 @@ public sealed class HelloWorkflowServiceTests
                     }
                 ]
             }),
+            CreateRouterService(),
             CreateIntegrityChain(),
             CreateManifestSigner());
 
         var artifacts = service.CreateHelloArtifacts("run-1");
 
         Assert.Equal(new[] { new ModelRef("openai-gpt-4.1-mini", "openai", "2026-02") }, artifacts.Manifest.Models);
+        Assert.Single(artifacts.Manifest.RoutingDecisions);
+        Assert.Equal("workflow.hello", artifacts.Manifest.RoutingDecisions.Single().TaskClass);
+        Assert.Equal("openai-gpt-4.1-mini", artifacts.Manifest.RoutingDecisions.Single().SelectedCandidate!.ModelId);
         Assert.Equal(new[] { new ToolRef("web-search", "1.0") }, artifacts.Manifest.Tools);
         Assert.Equal(
             new[] { new PolicyDecision("allow-approved-tools", "allow", "configured default policy") },
@@ -89,19 +101,20 @@ public sealed class HelloWorkflowServiceTests
 
         var artifacts = service.CreateHelloArtifacts("run-ordered");
 
-        Assert.Equal(["model-b", "model-a"], artifacts.Manifest.Models.Select(m => m.ModelId));
+        Assert.Equal(["openai-gpt-4.1-mini"], artifacts.Manifest.Models.Select(m => m.ModelId));
         Assert.Equal(["tool-2", "tool-1"], artifacts.Manifest.Tools.Select(t => t.ToolId));
         Assert.Equal(["policy-z", "policy-a"], artifacts.Manifest.PolicyDecisions.Select(p => p.PolicyId));
     }
 
     [Fact]
-    public void CreateHelloArtifacts_WhenConfigIsMissingRequiredEntries_Throws()
+    public void CreateHelloArtifacts_WhenRoutingConfigIsMissingRequiredEntries_Throws()
     {
         var service = CreateService(new HelloWorkflowOptions
         {
+            Routing = new HelloWorkflowRoutingOptions { TaskClass = "" },
             Models =
             [
-                new HelloWorkflowModelOptions { ModelId = "", Provider = "openai", Version = "2026-02" }
+                new HelloWorkflowModelOptions { ModelId = "openai-gpt-4.1-mini", Provider = "openai", Version = "2026-02" }
             ],
             Tools =
             [
@@ -115,7 +128,25 @@ public sealed class HelloWorkflowServiceTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => service.CreateHelloArtifacts("run-invalid"));
 
-        Assert.Contains("HelloWorkflow.Models[].ModelId is required.", ex.Message);
+        Assert.Contains("HelloWorkflow.Routing.TaskClass is required.", ex.Message);
+    }
+
+    [Fact]
+    public void CreateHelloArtifacts_WhenRouterHasNoSelection_Throws()
+    {
+        var service = new HelloWorkflowService(
+            new FixedSeedProvider(new SeedInfo("seed-run-1", "test", 123, "test")),
+            new FixedTimeSource(
+                new DateTimeOffset(2026, 2, 26, 20, 0, 0, TimeSpan.Zero),
+                new TimeSourceInfo("record", "stub", "clock-1", "utc-millis", null)),
+            Microsoft.Extensions.Options.Options.Create(CreateValidOptions()),
+            new FixedRouterService(CreateRoutingResult(hasSelection: false)),
+            CreateIntegrityChain(),
+            CreateManifestSigner());
+
+        var ex = Assert.Throws<InvalidOperationException>(() => service.CreateHelloArtifacts("run-no-route"));
+
+        Assert.Contains("Router did not select a model", ex.Message);
     }
 
     private static HelloWorkflowService CreateService(HelloWorkflowOptions options)
@@ -126,8 +157,52 @@ public sealed class HelloWorkflowServiceTests
                 new DateTimeOffset(2026, 2, 26, 20, 30, 0, TimeSpan.Zero),
                 new TimeSourceInfo("record", "stub", "clock-1", "utc-millis", null)),
             Microsoft.Extensions.Options.Options.Create(options),
+            CreateRouterService(),
             CreateIntegrityChain(),
             CreateManifestSigner());
+    }
+
+    private static HelloWorkflowOptions CreateValidOptions() => new()
+    {
+        Tools =
+        [
+            new HelloWorkflowToolOptions { ToolId = "web-search", Version = "1.0" }
+        ],
+        PolicyDecisions =
+        [
+            new HelloWorkflowPolicyOptions { PolicyId = "policy-1", Decision = "allow", Reason = null }
+        ]
+    };
+
+    private static IRouterService CreateRouterService() => new FixedRouterService(CreateRoutingResult());
+
+    private static RouterSelectionResult CreateRoutingResult(bool hasSelection = true)
+    {
+        var selectedCandidate = hasSelection
+            ? new RouterModelCandidate(
+                ModelId: "openai-gpt-4.1-mini",
+                Provider: "openai",
+                Version: "2026-02",
+                LatencyMs: 180,
+                CostPer1KTokens: 0.4m,
+                QualityScore: 82,
+                ComplianceScore: 90,
+                ComplianceTags: [ "eu", "standard" ])
+            : null;
+
+        var rankedCandidates = selectedCandidate is null
+            ? Array.Empty<RouterCandidateScore>()
+            : [new RouterCandidateScore(selectedCandidate, 0.8125m)];
+
+        return new RouterSelectionResult(
+            TaskClass: "workflow.hello",
+            Policy: new RouterSelectionPolicy(
+                PolicyId: "test-policy",
+                EffectiveConstraints: new RouterSelectionConstraints(220, 0.5m, 60, [ "eu", "standard" ]),
+                EffectiveWeights: new RouterSelectionWeights(0.35m, 0.2m, 0.3m, 0.15m)),
+            SelectedCandidate: selectedCandidate,
+            RankedCandidates: rankedCandidates,
+            RejectionReasons: []);
     }
 
     private static IEventLogIntegrityChain CreateIntegrityChain() =>
@@ -162,5 +237,17 @@ public sealed class HelloWorkflowServiceTests
         public DateTimeOffset NowUtc() => _instant;
 
         public TimeSourceInfo Describe() => _descriptor;
+    }
+
+    private sealed class FixedRouterService : IRouterService
+    {
+        private readonly RouterSelectionResult _routingResult;
+
+        public FixedRouterService(RouterSelectionResult routingResult)
+        {
+            _routingResult = routingResult;
+        }
+
+        public RouterSelectionResult SelectModel(RouterSelectionRequest request) => _routingResult;
     }
 }

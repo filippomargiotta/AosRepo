@@ -9,6 +9,7 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
     private readonly ISeedProvider _seedProvider;
     private readonly ITimeSource _timeSource;
     private readonly HelloWorkflowOptions _options;
+    private readonly IRouterService _routerService;
     private readonly IEventLogIntegrityChain _eventLogIntegrityChain;
     private readonly IManifestSigner _manifestSigner;
 
@@ -16,12 +17,14 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
         ISeedProvider seedProvider,
         ITimeSource timeSource,
         IOptions<HelloWorkflowOptions> options,
+        IRouterService routerService,
         IEventLogIntegrityChain eventLogIntegrityChain,
         IManifestSigner manifestSigner)
     {
         _seedProvider = seedProvider;
         _timeSource = timeSource;
         _options = options.Value;
+        _routerService = routerService;
         _eventLogIntegrityChain = eventLogIntegrityChain;
         _manifestSigner = manifestSigner;
     }
@@ -36,7 +39,8 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
         var now = _timeSource.NowUtc();
         var seed = _seedProvider.GetLockedSeed(runId);
         var timeSourceInfo = _timeSource.Describe();
-        var models = ResolveModels();
+        var routingDecision = ResolveRoutingDecision();
+        var models = new[] { MapModelRef(routingDecision.SelectedCandidate!) };
         var tools = ResolveTools();
         var policyDecisions = ResolvePolicyDecisions();
 
@@ -55,6 +59,7 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
             Models: models,
             Tools: tools,
             PolicyDecisions: policyDecisions,
+            RoutingDecisions: [routingDecision],
             EventLog: BuildEventLogSummary(eventLogRecords),
             StartedAtUtc: now,
             CompletedAtUtc: now);
@@ -83,18 +88,32 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
             LastChainMac: eventLogRecords[^1].Integrity.ChainMac);
     }
 
-    private IReadOnlyList<ModelRef> ResolveModels()
+    private RouterSelectionResult ResolveRoutingDecision()
     {
-        if (_options.Models.Count == 0)
+        var routing = _options.Routing;
+        var taskClass = RequireValue(routing.TaskClass, "HelloWorkflow.Routing.TaskClass");
+        var result = _routerService.SelectModel(new RouterSelectionRequest(
+            TaskClass: taskClass,
+            MaxLatencyMs: routing.MaxLatencyMs,
+            MaxCostPer1KTokens: routing.MaxCostPer1KTokens,
+            MinQualityScore: routing.MinQualityScore,
+            RequiredComplianceTags: routing.RequiredComplianceTags));
+
+        if (result.SelectedCandidate is null)
         {
-            throw new InvalidOperationException("HelloWorkflow.Models must contain at least one entry.");
+            throw new InvalidOperationException(
+                $"Router did not select a model for HelloWorkflow.Routing.TaskClass '{taskClass}'.");
         }
 
-        return _options.Models.Select(model => new ModelRef(
-                RequireValue(model.ModelId, "HelloWorkflow.Models[].ModelId"),
-                RequireValue(model.Provider, "HelloWorkflow.Models[].Provider"),
-                RequireValue(model.Version, "HelloWorkflow.Models[].Version")))
-            .ToArray();
+        return result;
+    }
+
+    private static ModelRef MapModelRef(RouterModelCandidate candidate)
+    {
+        return new ModelRef(
+            ModelId: candidate.ModelId,
+            Provider: candidate.Provider,
+            Version: candidate.Version);
     }
 
     private IReadOnlyList<ToolRef> ResolveTools()

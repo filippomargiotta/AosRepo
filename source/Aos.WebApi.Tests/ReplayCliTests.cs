@@ -198,7 +198,7 @@ public sealed class ReplayCliTests
 
             Assert.Equal(1, exitCode);
             Assert.Contains(
-                "Artifact compatibility failed: Event log line 1 payload manifestVersion '0.9' does not match manifest version '0.2'.",
+                "Artifact compatibility failed: Event log line 1 payload manifestVersion '0.9' does not match manifest version '0.3'.",
                 stderr.ToString());
         }
         finally

@@ -129,6 +129,51 @@ public static class ManifestValidator
             }
         }
 
+        if (manifest.RoutingDecisions is null || manifest.RoutingDecisions.Count == 0)
+        {
+            errors.Add("At least one RoutingDecision is required.");
+        }
+        else
+        {
+            for (var i = 0; i < manifest.RoutingDecisions.Count; i++)
+            {
+                var routingDecision = manifest.RoutingDecisions[i];
+                if (string.IsNullOrWhiteSpace(routingDecision.TaskClass))
+                {
+                    errors.Add($"RoutingDecisions[{i}].TaskClass is required.");
+                }
+
+                ValidateRouterPolicy(routingDecision.Policy, i, errors);
+
+                if (routingDecision.SelectedCandidate is null)
+                {
+                    errors.Add($"RoutingDecisions[{i}].SelectedCandidate is required.");
+                }
+                else
+                {
+                    ValidateRouterCandidate(
+                        routingDecision.SelectedCandidate,
+                        $"RoutingDecisions[{i}].SelectedCandidate",
+                        errors);
+                }
+
+                if (routingDecision.RankedCandidates is null || routingDecision.RankedCandidates.Count == 0)
+                {
+                    errors.Add($"RoutingDecisions[{i}].RankedCandidates must contain at least one entry.");
+                }
+                else
+                {
+                    for (var j = 0; j < routingDecision.RankedCandidates.Count; j++)
+                    {
+                        ValidateRouterCandidate(
+                            routingDecision.RankedCandidates[j].Candidate,
+                            $"RoutingDecisions[{i}].RankedCandidates[{j}].Candidate",
+                            errors);
+                    }
+                }
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(manifest.EventLog.SchemaVersion))
         {
             errors.Add("EventLog.SchemaVersion is required.");
@@ -156,5 +201,63 @@ public static class ManifestValidator
         }
 
         return errors;
+    }
+
+    private static void ValidateRouterPolicy(
+        RouterSelectionPolicy? policy,
+        int index,
+        ICollection<string> errors)
+    {
+        if (policy is null)
+        {
+            errors.Add($"RoutingDecisions[{index}].Policy is required.");
+            return;
+        }
+
+        if (policy.EffectiveConstraints is null)
+        {
+            errors.Add($"RoutingDecisions[{index}].Policy.EffectiveConstraints is required.");
+        }
+        else if (policy.EffectiveConstraints.RequiredComplianceTags is null ||
+                 policy.EffectiveConstraints.RequiredComplianceTags.Any(string.IsNullOrWhiteSpace))
+        {
+            errors.Add($"RoutingDecisions[{index}].Policy.EffectiveConstraints.RequiredComplianceTags cannot contain blank entries.");
+        }
+
+        if (policy.EffectiveWeights is null)
+        {
+            errors.Add($"RoutingDecisions[{index}].Policy.EffectiveWeights is required.");
+            return;
+        }
+
+        var weightTotal = policy.EffectiveWeights.Latency +
+                          policy.EffectiveWeights.Cost +
+                          policy.EffectiveWeights.Quality +
+                          policy.EffectiveWeights.Compliance;
+        if (weightTotal <= 0)
+        {
+            errors.Add($"RoutingDecisions[{index}].Policy.EffectiveWeights must sum to a positive value.");
+        }
+    }
+
+    private static void ValidateRouterCandidate(
+        RouterModelCandidate candidate,
+        string path,
+        ICollection<string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(candidate.ModelId))
+        {
+            errors.Add($"{path}.ModelId is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(candidate.Provider))
+        {
+            errors.Add($"{path}.Provider is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(candidate.Version))
+        {
+            errors.Add($"{path}.Version is required.");
+        }
     }
 }

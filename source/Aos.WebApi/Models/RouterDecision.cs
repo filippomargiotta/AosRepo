@@ -24,8 +24,29 @@ public sealed record RouterCandidateScore(
     decimal Score
 );
 
+public sealed record RouterSelectionConstraints(
+    int? MaxLatencyMs,
+    decimal? MaxCostPer1KTokens,
+    int? MinQualityScore,
+    IReadOnlyList<string> RequiredComplianceTags
+);
+
+public sealed record RouterSelectionWeights(
+    decimal Latency,
+    decimal Cost,
+    decimal Quality,
+    decimal Compliance
+);
+
+public sealed record RouterSelectionPolicy(
+    string? PolicyId,
+    RouterSelectionConstraints EffectiveConstraints,
+    RouterSelectionWeights EffectiveWeights
+);
+
 public sealed record RouterSelectionResult(
     string TaskClass,
+    RouterSelectionPolicy Policy,
     RouterModelCandidate? SelectedCandidate,
     IReadOnlyList<RouterCandidateScore> RankedCandidates,
     IReadOnlyList<string> RejectionReasons

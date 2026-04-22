@@ -43,6 +43,7 @@ Expected result: exit code `0` and a per-scenario PASS summary.
 ## Router API
 
 The API also exposes a deterministic router decision endpoint backed by configured model candidates and weighted routing scores.
+The `hello` workflow now uses the same router path and records the effective routing decision in the signed manifest so replay can reproduce the original model selection without depending on live router configuration.
 
 Sample request:
 

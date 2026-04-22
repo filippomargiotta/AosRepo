@@ -1,7 +1,7 @@
 # Replay Artifact Schema Versioning
 
 ## Current baseline
-- Manifest schema version is locked to `0.2`.
+- Manifest schema version is locked to `0.3`.
 - Event log schema baseline is `0.2`.
 - Replay currently supports exact-version artifacts only; it does not attempt cross-version migration.
 
@@ -14,6 +14,7 @@
 - The manifest `manifest.manifestVersion` must be supported exactly by the runtime validator.
 - Replay validates the manifest HMAC before event-log validation or workflow replay.
 - The manifest payload now includes `eventLog.schemaVersion`, `eventLog.recordCount`, and `eventLog.lastChainMac`.
+- The manifest payload now includes `routingDecisions[]`, with the effective router policy, selected model, ranked candidates, scores, and rejection reasons used for the run.
 - Every event-log record must use a supported `schemaVersion`.
 - Every event-log record wraps the domain event as:
   - `entry`
@@ -26,6 +27,7 @@
 - If an event-log payload includes `manifestVersion`, it must match the manifest `manifestVersion`.
 - The event log line count must match `manifest.eventLog.recordCount`.
 - The event log tail `chainMac` must match `manifest.eventLog.lastChainMac`.
+- Replay uses the recorded routing decision instead of re-evaluating live router configuration, so historical artifacts stay reproducible after policy/candidate changes.
 - Workflow selection is still CLI-driven and is not yet encoded into the manifest schema.
 
 ## Change policy

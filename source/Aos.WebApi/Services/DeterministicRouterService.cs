@@ -24,20 +24,23 @@ public sealed class DeterministicRouterService : IRouterService
 
         ValidateOptions();
 
-        var requiredTags = NormalizeTags(request.RequiredComplianceTags);
+        var taskClass = request.TaskClass.Trim();
+        var policy = ResolvePolicy(taskClass);
+        var effectiveConstraints = ResolveConstraints(request, policy);
+        var effectiveWeights = NormalizeWeights(policy?.Weights ?? _options.Weights);
         var rankedCandidates = new List<RouterCandidateScore>();
         var rejectionReasons = new List<string>();
 
         foreach (var candidate in _options.Candidates.Select(MapCandidate))
         {
-            var candidateRejections = GetCandidateRejections(candidate, request, requiredTags);
+            var candidateRejections = GetCandidateRejections(candidate, effectiveConstraints);
             if (candidateRejections.Count > 0)
             {
                 rejectionReasons.AddRange(candidateRejections);
                 continue;
             }
 
-            rankedCandidates.Add(new RouterCandidateScore(candidate, ComputeScore(candidate, request)));
+            rankedCandidates.Add(new RouterCandidateScore(candidate, ComputeScore(candidate, effectiveConstraints, effectiveWeights)));
         }
 
         var orderedCandidates = rankedCandidates
@@ -52,7 +55,11 @@ public sealed class DeterministicRouterService : IRouterService
             .ToArray();
 
         return new RouterSelectionResult(
-            TaskClass: request.TaskClass,
+            TaskClass: taskClass,
+            Policy: new RouterSelectionPolicy(
+                PolicyId: string.IsNullOrWhiteSpace(policy?.PolicyId) ? null : policy.PolicyId,
+                EffectiveConstraints: effectiveConstraints,
+                EffectiveWeights: effectiveWeights),
             SelectedCandidate: orderedCandidates.FirstOrDefault()?.Candidate,
             RankedCandidates: orderedCandidates,
             RejectionReasons: rejectionReasons);
@@ -65,11 +72,7 @@ public sealed class DeterministicRouterService : IRouterService
             throw new InvalidOperationException("Router.Candidates must contain at least one entry.");
         }
 
-        var weightTotal = _options.Weights.Latency + _options.Weights.Cost + _options.Weights.Quality + _options.Weights.Compliance;
-        if (weightTotal <= 0)
-        {
-            throw new InvalidOperationException("Router.Weights must sum to a positive value.");
-        }
+        ValidateWeights(_options.Weights, "Router.Weights");
 
         var duplicateIds = _options.Candidates
             .GroupBy(candidate => $"{candidate.Provider}:{candidate.ModelId}:{candidate.Version}", StringComparer.Ordinal)
@@ -82,34 +85,60 @@ public sealed class DeterministicRouterService : IRouterService
             throw new InvalidOperationException(
                 $"Router.Candidates contains duplicate provider/model/version entries: {string.Join(", ", duplicateIds)}.");
         }
+
+        var duplicatePolicies = _options.Policies
+            .Where(policy => !string.IsNullOrWhiteSpace(policy.TaskClass))
+            .GroupBy(policy => policy.TaskClass.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToArray();
+
+        if (duplicatePolicies.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Router.Policies contains duplicate taskClass entries: {string.Join(", ", duplicatePolicies)}.");
+        }
+
+        for (var i = 0; i < _options.Policies.Count; i++)
+        {
+            var policy = _options.Policies[i];
+            if (string.IsNullOrWhiteSpace(policy.TaskClass))
+            {
+                throw new InvalidOperationException($"Router.Policies[{i}].TaskClass is required.");
+            }
+
+            if (policy.Weights is not null)
+            {
+                ValidateWeights(policy.Weights, $"Router.Policies[{i}].Weights");
+            }
+        }
     }
 
     private List<string> GetCandidateRejections(
         RouterModelCandidate candidate,
-        RouterSelectionRequest request,
-        IReadOnlySet<string> requiredTags)
+        RouterSelectionConstraints constraints)
     {
         var rejections = new List<string>();
 
-        if (request.MaxLatencyMs is int maxLatency && candidate.LatencyMs > maxLatency)
+        if (constraints.MaxLatencyMs is int maxLatency && candidate.LatencyMs > maxLatency)
         {
             rejections.Add(
                 $"Candidate {candidate.Provider}/{candidate.ModelId}/{candidate.Version} rejected: latency {candidate.LatencyMs}ms exceeds max {maxLatency}ms.");
         }
 
-        if (request.MaxCostPer1KTokens is decimal maxCost && candidate.CostPer1KTokens > maxCost)
+        if (constraints.MaxCostPer1KTokens is decimal maxCost && candidate.CostPer1KTokens > maxCost)
         {
             rejections.Add(
                 $"Candidate {candidate.Provider}/{candidate.ModelId}/{candidate.Version} rejected: cost {candidate.CostPer1KTokens:0.###} exceeds max {maxCost:0.###}.");
         }
 
-        if (request.MinQualityScore is int minQuality && candidate.QualityScore < minQuality)
+        if (constraints.MinQualityScore is int minQuality && candidate.QualityScore < minQuality)
         {
             rejections.Add(
                 $"Candidate {candidate.Provider}/{candidate.ModelId}/{candidate.Version} rejected: quality {candidate.QualityScore} is below min {minQuality}.");
         }
 
-        var missingTags = requiredTags
+        var missingTags = constraints.RequiredComplianceTags
             .Except(candidate.ComplianceTags, StringComparer.Ordinal)
             .OrderBy(tag => tag, StringComparer.Ordinal)
             .ToArray();
@@ -123,18 +152,20 @@ public sealed class DeterministicRouterService : IRouterService
         return rejections;
     }
 
-    private decimal ComputeScore(RouterModelCandidate candidate, RouterSelectionRequest request)
+    private decimal ComputeScore(
+        RouterModelCandidate candidate,
+        RouterSelectionConstraints constraints,
+        RouterSelectionWeights weights)
     {
-        var weights = NormalizeWeights();
-        var latencyScore = request.MaxLatencyMs is int maxLatency
+        var latencyScore = constraints.MaxLatencyMs is int maxLatency
             ? 1m - ((decimal)candidate.LatencyMs / maxLatency)
             : 1000m / (1000m + candidate.LatencyMs);
-        var costScore = request.MaxCostPer1KTokens is decimal maxCost
+        var costScore = constraints.MaxCostPer1KTokens is decimal maxCost
             ? 1m - (candidate.CostPer1KTokens / maxCost)
             : 1m / (1m + candidate.CostPer1KTokens);
-        var qualityFloor = request.MinQualityScore ?? 0;
+        var qualityFloor = constraints.MinQualityScore ?? 0;
         var qualityRange = Math.Max(1, 100 - qualityFloor);
-        var qualityScore = request.MinQualityScore is int
+        var qualityScore = constraints.MinQualityScore is int
             ? (candidate.QualityScore - qualityFloor) / (decimal)qualityRange
             : candidate.QualityScore / 100m;
         var complianceScore = candidate.ComplianceScore / 100m;
@@ -148,16 +179,45 @@ public sealed class DeterministicRouterService : IRouterService
             MidpointRounding.AwayFromZero);
     }
 
-    private RouterWeightsOptions NormalizeWeights()
+    private RouterPolicyOptions? ResolvePolicy(string taskClass)
     {
-        var total = _options.Weights.Latency + _options.Weights.Cost + _options.Weights.Quality + _options.Weights.Compliance;
-        return new RouterWeightsOptions
+        return _options.Policies.FirstOrDefault(policy =>
+            string.Equals(policy.TaskClass?.Trim(), taskClass, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static RouterSelectionConstraints ResolveConstraints(
+        RouterSelectionRequest request,
+        RouterPolicyOptions? policy)
+    {
+        var requiredTags = NormalizeTags(policy?.RequiredComplianceTags)
+            .Union(NormalizeTags(request.RequiredComplianceTags), StringComparer.Ordinal)
+            .OrderBy(tag => tag, StringComparer.Ordinal)
+            .ToArray();
+
+        return new RouterSelectionConstraints(
+            MaxLatencyMs: MinNullable(request.MaxLatencyMs, policy?.MaxLatencyMs),
+            MaxCostPer1KTokens: MinNullable(request.MaxCostPer1KTokens, policy?.MaxCostPer1KTokens),
+            MinQualityScore: MaxNullable(request.MinQualityScore, policy?.MinQualityScore),
+            RequiredComplianceTags: requiredTags);
+    }
+
+    private static RouterSelectionWeights NormalizeWeights(RouterWeightsOptions weights)
+    {
+        var total = weights.Latency + weights.Cost + weights.Quality + weights.Compliance;
+        return new RouterSelectionWeights(
+            Latency: weights.Latency / total,
+            Cost: weights.Cost / total,
+            Quality: weights.Quality / total,
+            Compliance: weights.Compliance / total);
+    }
+
+    private static void ValidateWeights(RouterWeightsOptions weights, string path)
+    {
+        var weightTotal = weights.Latency + weights.Cost + weights.Quality + weights.Compliance;
+        if (weightTotal <= 0)
         {
-            Latency = _options.Weights.Latency / total,
-            Cost = _options.Weights.Cost / total,
-            Quality = _options.Weights.Quality / total,
-            Compliance = _options.Weights.Compliance / total
-        };
+            throw new InvalidOperationException($"{path} must sum to a positive value.");
+        }
     }
 
     private static RouterModelCandidate MapCandidate(RouterModelOptions candidate)
@@ -194,6 +254,36 @@ public sealed class DeterministicRouterService : IRouterService
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
             .Select(tag => tag.Trim().ToLowerInvariant())
             .ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(StringComparer.Ordinal);
+    }
+
+    private static int? MinNullable(int? first, int? second)
+    {
+        if (first is null)
+        {
+            return second;
+        }
+
+        return second is null ? first : Math.Min(first.Value, second.Value);
+    }
+
+    private static decimal? MinNullable(decimal? first, decimal? second)
+    {
+        if (first is null)
+        {
+            return second;
+        }
+
+        return second is null ? first : Math.Min(first.Value, second.Value);
+    }
+
+    private static int? MaxNullable(int? first, int? second)
+    {
+        if (first is null)
+        {
+            return second;
+        }
+
+        return second is null ? first : Math.Max(first.Value, second.Value);
     }
 
     private static decimal Clamp01(decimal value) => decimal.Max(0m, decimal.Min(1m, value));

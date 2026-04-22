@@ -21,6 +21,7 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
             new FixedSeedProvider(manifest.Seed),
             replayTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateOptionsFromManifest(manifest)),
+            new FixedRouterService(manifest.RoutingDecisions.Single()),
             eventLogIntegrityChain,
             manifestSigner);
 
@@ -30,8 +31,17 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
 
     private static HelloWorkflowOptions CreateOptionsFromManifest(Manifest manifest)
     {
+        var routingDecision = manifest.RoutingDecisions.Single();
         return new HelloWorkflowOptions
         {
+            Routing = new HelloWorkflowRoutingOptions
+            {
+                TaskClass = routingDecision.TaskClass,
+                MaxLatencyMs = routingDecision.Policy.EffectiveConstraints.MaxLatencyMs,
+                MaxCostPer1KTokens = routingDecision.Policy.EffectiveConstraints.MaxCostPer1KTokens,
+                MinQualityScore = routingDecision.Policy.EffectiveConstraints.MinQualityScore,
+                RequiredComplianceTags = routingDecision.Policy.EffectiveConstraints.RequiredComplianceTags.ToList()
+            },
             Models = manifest.Models
                 .Select(model => new HelloWorkflowModelOptions
                 {
@@ -68,5 +78,26 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
         }
 
         public SeedInfo GetLockedSeed(string runId) => _seed;
+    }
+
+    private sealed class FixedRouterService : IRouterService
+    {
+        private readonly RouterSelectionResult _routingDecision;
+
+        public FixedRouterService(RouterSelectionResult routingDecision)
+        {
+            _routingDecision = routingDecision;
+        }
+
+        public RouterSelectionResult SelectModel(RouterSelectionRequest request)
+        {
+            if (!string.Equals(request.TaskClass, _routingDecision.TaskClass, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Replay requested task class '{request.TaskClass}', expected '{_routingDecision.TaskClass}'.");
+            }
+
+            return _routingDecision;
+        }
     }
 }

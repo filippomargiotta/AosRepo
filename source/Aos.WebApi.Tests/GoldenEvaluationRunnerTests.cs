@@ -39,7 +39,7 @@ public sealed class GoldenEvaluationRunnerTests
             await File.WriteAllTextAsync(
                 Path.Combine(scenarioDir, "eventlog.jsonl"),
                 """
-                {"schemaVersion":"0.2","entry":{"runId":"run-golden-hello-1","eventType":"workflow.hello","data":{"message":"tampered","manifestVersion":"0.2"},"occurredAtUtc":"2026-02-26T19:00:00+00:00"},"integrity":{"algorithm":"HMAC-SHA256","keyId":"golden-key-1","previousChainMac":null,"chainMac":"d63ea77315d4f7f0adf67a98b6c3cc8a404c8266258a5ddf03e0d758b19b59a5"}}
+                {"schemaVersion":"0.2","entry":{"runId":"run-golden-hello-1","eventType":"workflow.hello","data":{"message":"tampered","manifestVersion":"0.3"},"occurredAtUtc":"2026-02-26T19:00:00+00:00"},"integrity":{"algorithm":"HMAC-SHA256","keyId":"golden-key-1","previousChainMac":null,"chainMac":"d63ea77315d4f7f0adf67a98b6c3cc8a404c8266258a5ddf03e0d758b19b59a5"}}
                 """);
 
             using var stdout = new StringWriter();

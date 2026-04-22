@@ -21,6 +21,8 @@ public sealed class RouterServiceTests
 
         Assert.NotNull(result.SelectedCandidate);
         Assert.Equal("openai-gpt-4.1-mini", result.SelectedCandidate!.ModelId);
+        Assert.Null(result.Policy.PolicyId);
+        Assert.Equal(["eu", "standard"], result.Policy.EffectiveConstraints.RequiredComplianceTags);
         Assert.Single(result.RankedCandidates);
         Assert.NotEmpty(result.RejectionReasons);
     }
@@ -133,6 +135,79 @@ public sealed class RouterServiceTests
         Assert.Null(result.SelectedCandidate);
         Assert.Empty(result.RankedCandidates);
         Assert.NotEmpty(result.RejectionReasons);
+    }
+
+    [Fact]
+    public void SelectModel_AppliesTaskClassPolicyDefaults()
+    {
+        var options = CreateDefaultOptions();
+        options.Policies =
+        [
+            new RouterPolicyOptions
+            {
+                PolicyId = "audit-quality",
+                TaskClass = "audited.agent",
+                MaxLatencyMs = 300,
+                MaxCostPer1KTokens = 1.0m,
+                MinQualityScore = 80,
+                RequiredComplianceTags = [ "audit", "eu" ],
+                Weights = new RouterWeightsOptions
+                {
+                    Latency = 0.15m,
+                    Cost = 0.1m,
+                    Quality = 0.45m,
+                    Compliance = 0.3m
+                }
+            }
+        ];
+
+        var result = CreateService(options).SelectModel(new RouterSelectionRequest(
+            TaskClass: "audited.agent",
+            MaxLatencyMs: null,
+            MaxCostPer1KTokens: null,
+            MinQualityScore: null,
+            RequiredComplianceTags: null));
+
+        Assert.NotNull(result.SelectedCandidate);
+        Assert.Equal("azure-gpt-4.1", result.SelectedCandidate!.ModelId);
+        Assert.Equal("audit-quality", result.Policy.PolicyId);
+        Assert.Equal(300, result.Policy.EffectiveConstraints.MaxLatencyMs);
+        Assert.Equal(1.0m, result.Policy.EffectiveConstraints.MaxCostPer1KTokens);
+        Assert.Equal(80, result.Policy.EffectiveConstraints.MinQualityScore);
+        Assert.Equal(["audit", "eu"], result.Policy.EffectiveConstraints.RequiredComplianceTags);
+        Assert.Equal(0.45m, result.Policy.EffectiveWeights.Quality);
+    }
+
+    [Fact]
+    public void SelectModel_MergesRequestWithPolicyUsingStricterConstraints()
+    {
+        var options = CreateDefaultOptions();
+        options.Policies =
+        [
+            new RouterPolicyOptions
+            {
+                PolicyId = "hello-balanced-eu",
+                TaskClass = "workflow.hello",
+                MaxLatencyMs = 300,
+                MaxCostPer1KTokens = 1.0m,
+                MinQualityScore = 60,
+                RequiredComplianceTags = [ "eu" ]
+            }
+        ];
+
+        var result = CreateService(options).SelectModel(new RouterSelectionRequest(
+            TaskClass: "workflow.hello",
+            MaxLatencyMs: 220,
+            MaxCostPer1KTokens: 0.5m,
+            MinQualityScore: 70,
+            RequiredComplianceTags: [ "standard" ]));
+
+        Assert.NotNull(result.SelectedCandidate);
+        Assert.Equal("openai-gpt-4.1-mini", result.SelectedCandidate!.ModelId);
+        Assert.Equal(220, result.Policy.EffectiveConstraints.MaxLatencyMs);
+        Assert.Equal(0.5m, result.Policy.EffectiveConstraints.MaxCostPer1KTokens);
+        Assert.Equal(70, result.Policy.EffectiveConstraints.MinQualityScore);
+        Assert.Equal(["eu", "standard"], result.Policy.EffectiveConstraints.RequiredComplianceTags);
     }
 
     private static DeterministicRouterService CreateService(RouterOptions options)

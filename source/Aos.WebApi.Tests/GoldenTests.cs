@@ -42,6 +42,7 @@ public sealed class GoldenTests
             new FixedSeedProvider(GoldenSeed),
             recordTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
+            new FixedRouterService(CreateGoldenRoutingDecision()),
             CreateIntegrityChain(),
             CreateManifestSigner());
 
@@ -65,6 +66,7 @@ public sealed class GoldenTests
             new FixedSeedProvider(goldenManifestRecord.Manifest.Seed),
             replayTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
+            new FixedRouterService(goldenManifestRecord.Manifest.RoutingDecisions.Single()),
             CreateIntegrityChain(),
             CreateManifestSigner());
 
@@ -136,6 +138,14 @@ public sealed class GoldenTests
 
     private static HelloWorkflowOptions CreateGoldenHelloWorkflowOptions() => new()
     {
+        Routing = new HelloWorkflowRoutingOptions
+        {
+            TaskClass = "workflow.hello",
+            MaxLatencyMs = 100,
+            MaxCostPer1KTokens = 0.1m,
+            MinQualityScore = 50,
+            RequiredComplianceTags = [ "standard" ]
+        },
         Models =
         [
             new HelloWorkflowModelOptions
@@ -206,5 +216,40 @@ public sealed class GoldenTests
         }
 
         public TimeSourceInfo Describe() => _descriptor;
+    }
+
+    private sealed class FixedRouterService : IRouterService
+    {
+        private readonly RouterSelectionResult _routingDecision;
+
+        public FixedRouterService(RouterSelectionResult routingDecision)
+        {
+            _routingDecision = routingDecision;
+        }
+
+        public RouterSelectionResult SelectModel(RouterSelectionRequest request) => _routingDecision;
+    }
+
+    private static RouterSelectionResult CreateGoldenRoutingDecision()
+    {
+        var candidate = new RouterModelCandidate(
+            ModelId: "local-null",
+            Provider: "local",
+            Version: "0.0",
+            LatencyMs: 10,
+            CostPer1KTokens: 0.01m,
+            QualityScore: 80,
+            ComplianceScore: 90,
+            ComplianceTags: [ "standard" ]);
+
+        return new RouterSelectionResult(
+            TaskClass: "workflow.hello",
+            Policy: new RouterSelectionPolicy(
+                PolicyId: "golden-router-policy",
+                EffectiveConstraints: new RouterSelectionConstraints(100, 0.1m, 50, [ "standard" ]),
+                EffectiveWeights: new RouterSelectionWeights(0.25m, 0.25m, 0.25m, 0.25m)),
+            SelectedCandidate: candidate,
+            RankedCandidates: [new RouterCandidateScore(candidate, 0.85m)],
+            RejectionReasons: []);
     }
 }

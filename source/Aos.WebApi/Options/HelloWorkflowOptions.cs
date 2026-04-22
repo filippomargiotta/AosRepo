@@ -4,9 +4,23 @@ public sealed class HelloWorkflowOptions
 {
     public const string SectionName = "HelloWorkflow";
 
+    public HelloWorkflowRoutingOptions Routing { get; set; } = new();
     public List<HelloWorkflowModelOptions> Models { get; set; } = [];
     public List<HelloWorkflowToolOptions> Tools { get; set; } = [];
     public List<HelloWorkflowPolicyOptions> PolicyDecisions { get; set; } = [];
+}
+
+public sealed class HelloWorkflowRoutingOptions
+{
+    public string TaskClass { get; set; } = "workflow.hello";
+
+    public int? MaxLatencyMs { get; set; } = 220;
+
+    public decimal? MaxCostPer1KTokens { get; set; } = 0.5m;
+
+    public int? MinQualityScore { get; set; } = 60;
+
+    public List<string> RequiredComplianceTags { get; set; } = [ "eu", "standard" ];
 }
 
 public sealed class HelloWorkflowModelOptions
