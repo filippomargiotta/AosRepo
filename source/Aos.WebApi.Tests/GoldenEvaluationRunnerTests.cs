@@ -5,7 +5,7 @@ namespace Aos.WebApi.Tests;
 
 public sealed class GoldenEvaluationRunnerTests
 {
-    private const string TestHmacKey = "golden-hmac-key";
+    private const string TestHmacKey = GoldenArtifactTestSupport.GoldenHmacKey;
 
     [Fact]
     public async Task RunAsync_WithGoldenScenario_ReturnsSuccessSummary()
@@ -14,7 +14,7 @@ public sealed class GoldenEvaluationRunnerTests
         using var stderr = new StringWriter();
 
         var exitCode = await GoldenEvaluationRunner.RunAsync(
-            ["--scenarios-root", GetGoldenRoot(), "--hmac-key", TestHmacKey],
+            ["--scenarios-root", GoldenArtifactTestSupport.GetGoldenRoot(), "--hmac-key", TestHmacKey],
             stdout,
             stderr,
             CancellationToken.None);
@@ -28,14 +28,14 @@ public sealed class GoldenEvaluationRunnerTests
     [Fact]
     public async Task RunAsync_WhenScenarioReplayFails_ReturnsFailureSummary()
     {
-        var tempDir = CreateTempDir();
+        var tempDir = GoldenArtifactTestSupport.CreateTempDir("aos-eval");
 
         try
         {
             var scenarioDir = Path.Combine(tempDir, "hello-workflow-v1");
             Directory.CreateDirectory(scenarioDir);
-            File.Copy(GetGoldenPath("scenario.json"), Path.Combine(scenarioDir, "scenario.json"));
-            File.Copy(GetGoldenPath("manifest.json"), Path.Combine(scenarioDir, "manifest.json"));
+            File.Copy(GoldenArtifactTestSupport.GetGoldenPath("scenario.json"), Path.Combine(scenarioDir, "scenario.json"));
+            File.Copy(GoldenArtifactTestSupport.GetGoldenPath("manifest.json"), Path.Combine(scenarioDir, "manifest.json"));
             await File.WriteAllTextAsync(
                 Path.Combine(scenarioDir, "eventlog.jsonl"),
                 """
@@ -60,21 +60,5 @@ public sealed class GoldenEvaluationRunnerTests
         {
             Directory.Delete(tempDir, recursive: true);
         }
-    }
-
-    private static string GetGoldenRoot() => Path.GetFullPath(Path.Combine(
-        AppContext.BaseDirectory,
-        "..",
-        "..",
-        "..",
-        "Golden"));
-
-    private static string GetGoldenPath(string fileName) => Path.Combine(GetGoldenRoot(), "hello-workflow-v1", fileName);
-
-    private static string CreateTempDir()
-    {
-        var path = Path.Combine(Path.GetTempPath(), $"aos-eval-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(path);
-        return path;
     }
 }

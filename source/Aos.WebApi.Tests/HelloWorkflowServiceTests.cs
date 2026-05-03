@@ -1,7 +1,6 @@
 using Aos.WebApi.Models;
 using Aos.WebApi.Options;
 using Aos.WebApi.Services;
-using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Aos.WebApi.Tests;
@@ -179,30 +178,27 @@ public sealed class HelloWorkflowServiceTests
     private static RouterSelectionResult CreateRoutingResult(bool hasSelection = true)
     {
         var selectedCandidate = hasSelection
-            ? new RouterModelCandidate(
-                ModelId: "openai-gpt-4.1-mini",
-                Provider: "openai",
-                Version: "2026-02",
-                LatencyMs: 180,
-                CostPer1KTokens: 0.4m,
-                QualityScore: 82,
-                ComplianceScore: 90,
-                ComplianceTags: [ "eu", "standard" ])
+            ? RouterTestData.CreateCandidate(
+                modelId: "openai-gpt-4.1-mini",
+                provider: "openai",
+                version: "2026-02",
+                latencyMs: 180,
+                costPer1KTokens: 0.4m,
+                qualityScore: 82,
+                complianceTags: [ "eu", "standard" ])
             : null;
 
-        var rankedCandidates = selectedCandidate is null
-            ? Array.Empty<RouterCandidateScore>()
-            : [new RouterCandidateScore(selectedCandidate, 0.8125m)];
-
-        return new RouterSelectionResult(
-            TaskClass: "workflow.hello",
-            Policy: new RouterSelectionPolicy(
-                PolicyId: "test-policy",
-                EffectiveConstraints: new RouterSelectionConstraints(220, 0.5m, 60, [ "eu", "standard" ]),
-                EffectiveWeights: new RouterSelectionWeights(0.35m, 0.2m, 0.3m, 0.15m)),
-            SelectedCandidate: selectedCandidate,
-            RankedCandidates: rankedCandidates,
-            RejectionReasons: []);
+        return RouterTestData.CreateRoutingDecision(
+            taskClass: "workflow.hello",
+            policyId: "test-policy",
+            candidate: selectedCandidate,
+            maxLatencyMs: 220,
+            maxCostPer1KTokens: 0.5m,
+            minQualityScore: 60,
+            requiredComplianceTags: [ "eu", "standard" ],
+            effectiveWeights: new RouterSelectionWeights(0.35m, 0.2m, 0.3m, 0.15m),
+            score: 0.8125m,
+            includeSelection: hasSelection);
     }
 
     private static IEventLogIntegrityChain CreateIntegrityChain() =>
@@ -210,44 +206,4 @@ public sealed class HelloWorkflowServiceTests
 
     private static IManifestSigner CreateManifestSigner() =>
         new HmacManifestSigner(TestHmacKey, TestHmacKeyId);
-
-    private sealed class FixedSeedProvider : ISeedProvider
-    {
-        private readonly SeedInfo _seed;
-
-        public FixedSeedProvider(SeedInfo seed)
-        {
-            _seed = seed;
-        }
-
-        public SeedInfo GetLockedSeed(string runId) => _seed with { SeedId = $"seed-{runId}" };
-    }
-
-    private sealed class FixedTimeSource : ITimeSource
-    {
-        private readonly DateTimeOffset _instant;
-        private readonly TimeSourceInfo _descriptor;
-
-        public FixedTimeSource(DateTimeOffset instant, TimeSourceInfo descriptor)
-        {
-            _instant = instant;
-            _descriptor = descriptor;
-        }
-
-        public DateTimeOffset NowUtc() => _instant;
-
-        public TimeSourceInfo Describe() => _descriptor;
-    }
-
-    private sealed class FixedRouterService : IRouterService
-    {
-        private readonly RouterSelectionResult _routingResult;
-
-        public FixedRouterService(RouterSelectionResult routingResult)
-        {
-            _routingResult = routingResult;
-        }
-
-        public RouterSelectionResult SelectModel(RouterSelectionRequest request) => _routingResult;
-    }
 }

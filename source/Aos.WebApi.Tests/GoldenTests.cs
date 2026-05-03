@@ -1,30 +1,21 @@
-using System.Text;
-using System.Text.Json;
 using Aos.WebApi.Models;
 using Aos.WebApi.Options;
 using Aos.WebApi.Services;
-using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Aos.WebApi.Tests;
 
 public sealed class GoldenTests
 {
-    private const string GoldenScenario = "hello-workflow-v1";
     private const string GoldenRunId = "run-golden-hello-1";
-    private const string GoldenHmacKey = "golden-hmac-key";
-    private const string GoldenHmacKeyId = "golden-key-1";
+    private const string GoldenHmacKey = GoldenArtifactTestSupport.GoldenHmacKey;
+    private const string GoldenHmacKeyId = GoldenArtifactTestSupport.GoldenHmacKeyId;
     private static readonly DateTimeOffset GoldenInstant = new(2026, 2, 26, 19, 0, 0, TimeSpan.Zero);
     private static readonly SeedInfo GoldenSeed = new(
         SeedId: $"seed-{GoldenRunId}",
         Algorithm: "test-sequence",
         Value: 424242,
         Derivation: "golden-fixed");
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true
-    };
 
     [Fact]
     public void RecordHelloWorkflow_MatchesCheckedInGoldenArtifacts()
@@ -39,7 +30,7 @@ public sealed class GoldenTests
                 Notes: "golden fixture")));
 
         var service = new HelloWorkflowService(
-            new FixedSeedProvider(GoldenSeed),
+            new FixedSeedProvider(GoldenSeed, preserveSeedId: true),
             recordTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
             new FixedRouterService(CreateGoldenRoutingDecision()),
@@ -49,21 +40,21 @@ public sealed class GoldenTests
         var artifacts = service.CreateHelloArtifacts(GoldenRunId);
 
         Assert.Equal([GoldenInstant], recordTimeSource.GetRecordedInstants());
-        Assert.Equal(ReadGoldenManifestJson(), SerializeManifestRecord(artifacts.ManifestRecord));
-        Assert.Equal(ReadGoldenEventLogJsonl(), SerializeEventLogLines(artifacts.EventLogRecords));
+        Assert.Equal(GoldenArtifactTestSupport.ReadGoldenManifestJson(), GoldenArtifactTestSupport.SerializeManifestRecord(artifacts.ManifestRecord));
+        Assert.Equal(GoldenArtifactTestSupport.ReadGoldenEventLogJsonl(), GoldenArtifactTestSupport.SerializeEventLogLines(artifacts.EventLogRecords));
     }
 
     [Fact]
     public void ReplayHelloWorkflow_FromGoldenArtifacts_ReproducesDeterministicOutput()
     {
-        var goldenManifestRecord = ReadGoldenManifestRecord();
-        var goldenEventLogRecords = ReadGoldenEventLogRecords();
+        var goldenManifestRecord = GoldenArtifactTestSupport.ReadGoldenManifestRecord();
+        var goldenEventLogRecords = GoldenArtifactTestSupport.ReadGoldenEventLogRecords();
 
         var replayTimeSource = new ReplayTimeSource(
             [goldenManifestRecord.Manifest.StartedAtUtc],
             goldenManifestRecord.Manifest.TimeSource);
         var service = new HelloWorkflowService(
-            new FixedSeedProvider(goldenManifestRecord.Manifest.Seed),
+            new FixedSeedProvider(goldenManifestRecord.Manifest.Seed, preserveSeedId: true),
             replayTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
             new FixedRouterService(goldenManifestRecord.Manifest.RoutingDecisions.Single()),
@@ -73,53 +64,12 @@ public sealed class GoldenTests
         var replayed = service.CreateHelloArtifacts(goldenManifestRecord.Manifest.RunId);
 
         Assert.Equal(
-            SerializeManifestRecord(goldenManifestRecord),
-            SerializeManifestRecord(replayed.ManifestRecord));
+            GoldenArtifactTestSupport.SerializeManifestRecord(goldenManifestRecord),
+            GoldenArtifactTestSupport.SerializeManifestRecord(replayed.ManifestRecord));
 
         Assert.Equal(
-            SerializeEventLogLines(goldenEventLogRecords),
-            SerializeEventLogLines(replayed.EventLogRecords));
-    }
-
-    private static string ReadGoldenManifestJson() => File.ReadAllText(Path.Combine(GetGoldenDir(), "manifest.json"))
-        .TrimEnd('\r', '\n');
-
-    private static string ReadGoldenEventLogJsonl() => File.ReadAllText(Path.Combine(GetGoldenDir(), "eventlog.jsonl"));
-
-    private static ManifestRecord ReadGoldenManifestRecord()
-    {
-        var manifestRecord = JsonSerializer.Deserialize<ManifestRecord>(ReadGoldenManifestJson(), JsonOptions);
-        Assert.NotNull(manifestRecord);
-        return manifestRecord!;
-    }
-
-    private static IReadOnlyList<EventLogRecord> ReadGoldenEventLogRecords()
-    {
-        var records = new List<EventLogRecord>();
-        foreach (var line in ReadGoldenEventLogJsonl()
-                     .Split('\n', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var record = JsonSerializer.Deserialize<EventLogRecord>(line, JsonOptions);
-            Assert.NotNull(record);
-            records.Add(record!);
-        }
-
-        return records;
-    }
-
-    private static string SerializeManifestRecord(ManifestRecord manifestRecord) =>
-        JsonSerializer.Serialize(manifestRecord, JsonOptions);
-
-    private static string SerializeEventLogLines(IEnumerable<EventLogRecord> records)
-    {
-        var builder = new StringBuilder();
-        foreach (var record in records)
-        {
-            builder.Append(JsonSerializer.Serialize(record, JsonOptions));
-            builder.Append('\n');
-        }
-
-        return builder.ToString();
+            GoldenArtifactTestSupport.SerializeEventLogLines(goldenEventLogRecords),
+            GoldenArtifactTestSupport.SerializeEventLogLines(replayed.EventLogRecords));
     }
 
     private static IEventLogIntegrityChain CreateIntegrityChain() =>
@@ -127,14 +77,6 @@ public sealed class GoldenTests
 
     private static IManifestSigner CreateManifestSigner() =>
         new HmacManifestSigner(GoldenHmacKey, GoldenHmacKeyId);
-
-    private static string GetGoldenDir() => Path.GetFullPath(Path.Combine(
-        AppContext.BaseDirectory,
-        "..",
-        "..",
-        "..",
-        "Golden",
-        GoldenScenario));
 
     private static HelloWorkflowOptions CreateGoldenHelloWorkflowOptions() => new()
     {
@@ -174,82 +116,23 @@ public sealed class GoldenTests
         ]
     };
 
-    private sealed class FixedSeedProvider : ISeedProvider
-    {
-        private readonly SeedInfo _seed;
-
-        public FixedSeedProvider(SeedInfo seed)
-        {
-            _seed = seed;
-        }
-
-        public SeedInfo GetLockedSeed(string runId)
-        {
-            if (!string.Equals(runId, GoldenRunId, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException($"Unexpected run id: {runId}");
-            }
-
-            return _seed;
-        }
-    }
-
-    private sealed class FixedSequenceTimeSource : ITimeSource
-    {
-        private readonly Queue<DateTimeOffset> _instants;
-        private readonly TimeSourceInfo _descriptor;
-
-        public FixedSequenceTimeSource(IEnumerable<DateTimeOffset> instants, TimeSourceInfo descriptor)
-        {
-            _instants = new Queue<DateTimeOffset>(instants);
-            _descriptor = descriptor;
-        }
-
-        public DateTimeOffset NowUtc()
-        {
-            if (!_instants.TryDequeue(out var instant))
-            {
-                throw new InvalidOperationException("No more golden instants available.");
-            }
-
-            return instant;
-        }
-
-        public TimeSourceInfo Describe() => _descriptor;
-    }
-
-    private sealed class FixedRouterService : IRouterService
-    {
-        private readonly RouterSelectionResult _routingDecision;
-
-        public FixedRouterService(RouterSelectionResult routingDecision)
-        {
-            _routingDecision = routingDecision;
-        }
-
-        public RouterSelectionResult SelectModel(RouterSelectionRequest request) => _routingDecision;
-    }
-
     private static RouterSelectionResult CreateGoldenRoutingDecision()
     {
-        var candidate = new RouterModelCandidate(
-            ModelId: "local-null",
-            Provider: "local",
-            Version: "0.0",
-            LatencyMs: 10,
-            CostPer1KTokens: 0.01m,
-            QualityScore: 80,
-            ComplianceScore: 90,
-            ComplianceTags: [ "standard" ]);
+        var candidate = RouterTestData.CreateCandidate(
+            modelId: "local-null",
+            provider: "local",
+            version: "0.0",
+            complianceTags: [ "standard" ]);
 
-        return new RouterSelectionResult(
-            TaskClass: "workflow.hello",
-            Policy: new RouterSelectionPolicy(
-                PolicyId: "golden-router-policy",
-                EffectiveConstraints: new RouterSelectionConstraints(100, 0.1m, 50, [ "standard" ]),
-                EffectiveWeights: new RouterSelectionWeights(0.25m, 0.25m, 0.25m, 0.25m)),
-            SelectedCandidate: candidate,
-            RankedCandidates: [new RouterCandidateScore(candidate, 0.85m)],
-            RejectionReasons: []);
+        return RouterTestData.CreateRoutingDecision(
+            taskClass: "workflow.hello",
+            policyId: "golden-router-policy",
+            candidate: candidate,
+            maxLatencyMs: 100,
+            maxCostPer1KTokens: 0.1m,
+            minQualityScore: 50,
+            requiredComplianceTags: [ "standard" ],
+            effectiveWeights: new RouterSelectionWeights(0.25m, 0.25m, 0.25m, 0.25m),
+            score: 0.85m);
     }
 }

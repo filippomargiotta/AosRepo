@@ -160,26 +160,5 @@ public sealed class ManifestValidatorTests
         Assert.Contains("At least one RoutingDecision is required.", errors);
     }
 
-    private static RouterSelectionResult CreateRoutingDecision()
-    {
-        var candidate = new RouterModelCandidate(
-            ModelId: "model-1",
-            Provider: "local",
-            Version: "0.0",
-            LatencyMs: 10,
-            CostPer1KTokens: 0.01m,
-            QualityScore: 80,
-            ComplianceScore: 90,
-            ComplianceTags: [ "standard" ]);
-
-        return new RouterSelectionResult(
-            TaskClass: "workflow.hello",
-            Policy: new RouterSelectionPolicy(
-                PolicyId: "test-policy",
-                EffectiveConstraints: new RouterSelectionConstraints(100, 0.1m, 70, [ "standard" ]),
-                EffectiveWeights: new RouterSelectionWeights(0.25m, 0.25m, 0.25m, 0.25m)),
-            SelectedCandidate: candidate,
-            RankedCandidates: [new RouterCandidateScore(candidate, 0.9m)],
-            RejectionReasons: []);
-    }
+    private static RouterSelectionResult CreateRoutingDecision() => RouterTestData.CreateRoutingDecision();
 }
