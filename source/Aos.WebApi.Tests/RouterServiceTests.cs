@@ -210,6 +210,30 @@ public sealed class RouterServiceTests
         Assert.Equal(["eu", "standard"], result.Policy.EffectiveConstraints.RequiredComplianceTags);
     }
 
+    [Fact]
+    public async Task SelectModel_RemainsStableUnderConcurrentAccess()
+    {
+        var service = CreateService(CreateDefaultOptions());
+        var request = new RouterSelectionRequest(
+            TaskClass: "chat.response",
+            MaxLatencyMs: 400,
+            MaxCostPer1KTokens: 1.0m,
+            MinQualityScore: 50,
+            RequiredComplianceTags: ["eu"]);
+
+        var expected = service.SelectModel(request);
+        var results = await Task.WhenAll(Enumerable.Range(0, 64).Select(_ => Task.Run(() => service.SelectModel(request))));
+
+        Assert.All(results, result =>
+        {
+            Assert.Equal(expected.SelectedCandidate, result.SelectedCandidate);
+            Assert.Equal(
+                expected.RankedCandidates.Select(candidate => candidate.Candidate.ModelId),
+                result.RankedCandidates.Select(candidate => candidate.Candidate.ModelId));
+            Assert.Equal(expected.RejectionReasons, result.RejectionReasons);
+        });
+    }
+
     private static DeterministicRouterService CreateService(RouterOptions options)
         => new(Microsoft.Extensions.Options.Options.Create(options));
 

@@ -62,3 +62,17 @@ curl -X POST http://localhost:5057/router/decide \
 Expected result: a ranked deterministic routing decision with the selected model and any rejected candidates.
 
 Current schema/versioning rules for replay artifacts are documented in `project/SchemaVersioning.md`.
+
+## Router Benchmark
+
+The replay CLI can also report the current deterministic router latency baseline from the checked-in router configuration:
+
+```bash
+dotnet run --project source/Aos.ReplayCli -- \
+  benchmark-router \
+  --iterations 10000 \
+  --warmup 1000 \
+  --task-class workflow.hello
+```
+
+Expected result: a latency summary with min, median, p95, and max decision time plus the selected model and candidate counts.

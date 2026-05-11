@@ -16,7 +16,7 @@ This file captures the month-by-month plan to implement **AocWebApi** (Agentic O
 ### Definition of Done (DoD)
 - You can run a “hello workflow” and produce a **manifest + log**.
 
-### Coding agent sessions
+### Implementation slices
 - **Session A:** Scaffold solution + manifest model + baseline API route
 - **Session B:** Add log writer/reader + golden test harness skeleton
 
