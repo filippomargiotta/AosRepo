@@ -1,4 +1,5 @@
 using Aos.WebApi.Models;
+using Aos.WebApi.Options;
 
 namespace Aos.WebApi.Services;
 
@@ -7,11 +8,14 @@ internal static class RouterSelectionEngine
     public static RouterSelectionResult Select(
         string taskClass,
         CompiledRouterCatalog catalog,
-        RouterSelectionRequest request)
+        RouterSelectionRequest request,
+        RouterMetricsOptions? metricsOptions = null,
+        IRouterMetricsStore? metricsStore = null)
     {
         var policy = catalog.ResolvePolicy(taskClass);
         var effectiveConstraints = ResolveConstraints(request, policy);
         var effectiveWeights = policy?.Weights ?? catalog.DefaultWeights;
+        var metricsContext = RouterMetricsContext.Create(metricsOptions, metricsStore);
         var rankedCandidates = new List<RouterCandidateScore>();
         var rejectionReasons = new List<string>();
 
@@ -24,7 +28,10 @@ internal static class RouterSelectionEngine
                 continue;
             }
 
-            rankedCandidates.Add(new RouterCandidateScore(candidate, ComputeScore(candidate, effectiveConstraints, effectiveWeights)));
+            var scoringCandidate = metricsContext.Apply(taskClass, candidate);
+            rankedCandidates.Add(new RouterCandidateScore(
+                candidate,
+                ComputeScore(scoringCandidate, effectiveConstraints, effectiveWeights)));
         }
 
         var orderedCandidates = rankedCandidates
@@ -169,4 +176,51 @@ internal static class RouterSelectionEngine
     }
 
     private static decimal Clamp01(decimal value) => decimal.Max(0m, decimal.Min(1m, value));
+
+    private sealed record RouterMetricsContext(
+        bool Enabled,
+        decimal BlendWeight,
+        IRouterMetricsStore? Store)
+    {
+        public static RouterMetricsContext Create(
+            RouterMetricsOptions? options,
+            IRouterMetricsStore? store)
+        {
+            if (options is null || !options.Enabled || store is null || options.BlendWeight == 0m)
+            {
+                return new RouterMetricsContext(false, 0m, null);
+            }
+
+            return new RouterMetricsContext(true, options.BlendWeight, store);
+        }
+
+        public RouterModelCandidate Apply(string taskClass, RouterModelCandidate candidate)
+        {
+            if (!Enabled ||
+                Store is null ||
+                !Store.TryGetMetric(taskClass, candidate, out var metric) ||
+                metric is null ||
+                metric.SampleCount == 0)
+            {
+                return candidate;
+            }
+
+            return candidate with
+            {
+                LatencyMs = Blend(candidate.LatencyMs, metric.ObservedLatencyMs),
+                QualityScore = Blend(
+                    candidate.QualityScore,
+                    (int)decimal.Round(
+                        metric.QualityScore * metric.SuccessRate,
+                        0,
+                        MidpointRounding.AwayFromZero))
+            };
+        }
+
+        private int Blend(int configuredValue, int metricValue)
+        {
+            var blended = (configuredValue * (1m - BlendWeight)) + (metricValue * BlendWeight);
+            return (int)decimal.Round(blended, 0, MidpointRounding.AwayFromZero);
+        }
+    }
 }

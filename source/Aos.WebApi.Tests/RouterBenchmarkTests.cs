@@ -24,6 +24,7 @@ public sealed class RouterBenchmarkTests
         Assert.Equal(25, report.Iterations);
         Assert.Equal(5, report.WarmupIterations);
         Assert.Equal("openai-gpt-4.1-mini", report.SelectedModelId);
+        Assert.NotNull(report.SelectedScore);
         Assert.True(report.MinLatencyMs >= 0);
         Assert.True(report.MedianLatencyMs >= report.MinLatencyMs);
         Assert.True(report.P95LatencyMs >= report.MedianLatencyMs);
@@ -93,8 +94,103 @@ public sealed class RouterBenchmarkTests
             Assert.Equal(0, exitCode);
             Assert.Contains("Router benchmark: workflow.hello", stdout.ToString());
             Assert.Contains("iterations: 5", stdout.ToString());
+            Assert.Contains("metrics.enabled: False", stdout.ToString());
             Assert.Contains("selected: openai/openai-gpt-4.1-mini/2026-02", stdout.ToString());
+            Assert.Contains("selectedScore:", stdout.ToString());
             Assert.Contains("latency.p95Ms:", stdout.ToString());
+            Assert.Equal(string.Empty, stderr.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task BenchmarkRouterCli_WhenRequested_ComparesMetricsWeightedDecisionWithStaticDecision()
+    {
+        var tempDir = GoldenArtifactTestSupport.CreateTempDir("aos-router-benchmark-metrics-tests");
+        try
+        {
+            var configPath = Path.Combine(tempDir, "appsettings.json");
+            await File.WriteAllTextAsync(configPath, """
+                {
+                  "Router": {
+                    "Weights": {
+                      "Latency": 0,
+                      "Cost": 0,
+                      "Quality": 1,
+                      "Compliance": 0
+                    },
+                    "Candidates": [
+                      {
+                        "ModelId": "model-a",
+                        "Provider": "openai",
+                        "Version": "1",
+                        "LatencyMs": 100,
+                        "CostPer1KTokens": 0.1,
+                        "QualityScore": 80,
+                        "ComplianceScore": 90,
+                        "ComplianceTags": [ "eu" ]
+                      },
+                      {
+                        "ModelId": "model-b",
+                        "Provider": "openai",
+                        "Version": "1",
+                        "LatencyMs": 100,
+                        "CostPer1KTokens": 0.1,
+                        "QualityScore": 75,
+                        "ComplianceScore": 90,
+                        "ComplianceTags": [ "eu" ]
+                      }
+                    ]
+                  },
+                  "RouterMetrics": {
+                    "Enabled": true,
+                    "BlendWeight": 1,
+                    "Metrics": [
+                      {
+                        "TaskClass": "metrics.weighted",
+                        "Provider": "openai",
+                        "ModelId": "model-b",
+                        "Version": "1",
+                        "ObservedLatencyMs": 100,
+                        "SuccessRate": 1,
+                        "QualityScore": 100,
+                        "SampleCount": 50,
+                        "CapturedAtUtc": "2026-05-29T00:00:00Z",
+                        "Source": "test-fixture"
+                      }
+                    ]
+                  }
+                }
+                """);
+
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+
+            var exitCode = await RouterBenchmarkCliRunner.RunAsync(
+                [
+                    "--config", configPath,
+                    "--iterations", "5",
+                    "--warmup", "1",
+                    "--task-class", "metrics.weighted",
+                    "--max-latency-ms", "200",
+                    "--max-cost-per-1k-tokens", "1.0",
+                    "--min-quality-score", "60",
+                    "--required-compliance-tag", "eu",
+                    "--compare-without-metrics"
+                ],
+                stdout,
+                stderr,
+                CancellationToken.None);
+
+            var output = stdout.ToString();
+            Assert.Equal(0, exitCode);
+            Assert.Contains("metrics.enabled: True", output);
+            Assert.Contains("selected: openai/model-b/1", output);
+            Assert.Contains("comparison.withoutMetrics:", output);
+            Assert.Contains("  selected: openai/model-a/1", output);
             Assert.Equal(string.Empty, stderr.ToString());
         }
         finally

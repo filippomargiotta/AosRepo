@@ -4,6 +4,10 @@ public sealed class RouterMetricsOptions
 {
     public const string SectionName = "RouterMetrics";
 
+    public bool Enabled { get; set; }
+
+    public decimal BlendWeight { get; set; } = 0.5m;
+
     public List<RouterModelMetricOptions> Metrics { get; set; } = [];
 }
 

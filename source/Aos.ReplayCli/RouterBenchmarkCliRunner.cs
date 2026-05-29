@@ -29,24 +29,49 @@ public static class RouterBenchmarkCliRunner
 
         try
         {
-            var routerOptions = await LoadRouterOptionsAsync(request.ConfigPath, cancellationToken);
-            var router = new DeterministicRouterService(Options.Create(routerOptions));
+            var config = await LoadRouterBenchmarkConfigAsync(request.ConfigPath, cancellationToken);
+            var router = CreateRouter(config.RouterOptions, config.MetricsOptions);
             var report = RouterBenchmarkRunner.Run(
                 router,
                 request.SelectionRequest,
                 new RouterBenchmarkOptions(request.Iterations, request.WarmupIterations));
 
             await stdout.WriteLineAsync($"Router benchmark: {report.TaskClass}");
+            await stdout.WriteLineAsync($"metrics.enabled: {config.MetricsOptions.Enabled}");
+            await stdout.WriteLineAsync($"metrics.blendWeight: {FormatDecimal(config.MetricsOptions.BlendWeight)}");
+            await stdout.WriteLineAsync($"metrics.count: {config.MetricsOptions.Metrics.Count}");
             await stdout.WriteLineAsync($"iterations: {report.Iterations}");
             await stdout.WriteLineAsync($"warmupIterations: {report.WarmupIterations}");
             await stdout.WriteLineAsync(
                 $"selected: {FormatSelectedModel(report.SelectedProvider, report.SelectedModelId, report.SelectedVersion)}");
+            await stdout.WriteLineAsync($"selectedScore: {FormatNullableDecimal(report.SelectedScore)}");
             await stdout.WriteLineAsync($"rankedCandidates: {report.RankedCandidateCount}");
             await stdout.WriteLineAsync($"rejections: {report.RejectionCount}");
             await stdout.WriteLineAsync($"latency.minMs: {FormatLatency(report.MinLatencyMs)}");
             await stdout.WriteLineAsync($"latency.medianMs: {FormatLatency(report.MedianLatencyMs)}");
             await stdout.WriteLineAsync($"latency.p95Ms: {FormatLatency(report.P95LatencyMs)}");
             await stdout.WriteLineAsync($"latency.maxMs: {FormatLatency(report.MaxLatencyMs)}");
+
+            if (request.CompareWithoutMetrics && config.MetricsOptions.Enabled)
+            {
+                var staticMetricsOptions = new RouterMetricsOptions
+                {
+                    Enabled = false,
+                    BlendWeight = config.MetricsOptions.BlendWeight,
+                    Metrics = config.MetricsOptions.Metrics
+                };
+                var staticReport = RouterBenchmarkRunner.Run(
+                    CreateRouter(config.RouterOptions, staticMetricsOptions),
+                    request.SelectionRequest,
+                    new RouterBenchmarkOptions(request.Iterations, request.WarmupIterations));
+
+                await stdout.WriteLineAsync("comparison.withoutMetrics:");
+                await stdout.WriteLineAsync(
+                    $"  selected: {FormatSelectedModel(staticReport.SelectedProvider, staticReport.SelectedModelId, staticReport.SelectedVersion)}");
+                await stdout.WriteLineAsync($"  selectedScore: {FormatNullableDecimal(staticReport.SelectedScore)}");
+                await stdout.WriteLineAsync($"  latency.p95Ms: {FormatLatency(staticReport.P95LatencyMs)}");
+            }
+
             return 0;
         }
         catch (FileNotFoundException ex)
@@ -84,6 +109,7 @@ public static class RouterBenchmarkCliRunner
         decimal? maxCostPer1KTokens = null;
         int? minQualityScore = null;
         var requiredComplianceTags = new List<string>();
+        var compareWithoutMetrics = false;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -144,6 +170,9 @@ public static class RouterBenchmarkCliRunner
                         args[++i]
                             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                     break;
+                case "--compare-without-metrics":
+                    compareWithoutMetrics = true;
+                    break;
                 default:
                     error = $"Unknown or incomplete argument: {args[i]}";
                     return false;
@@ -160,6 +189,7 @@ public static class RouterBenchmarkCliRunner
             configPath,
             iterations.Value,
             warmupIterations,
+            compareWithoutMetrics,
             new RouterSelectionRequest(
                 taskClass,
                 maxLatencyMs,
@@ -169,7 +199,9 @@ public static class RouterBenchmarkCliRunner
         return true;
     }
 
-    private static async Task<RouterOptions> LoadRouterOptionsAsync(string configPath, CancellationToken cancellationToken)
+    private static async Task<RouterBenchmarkConfig> LoadRouterBenchmarkConfigAsync(
+        string configPath,
+        CancellationToken cancellationToken)
     {
         await using var stream = File.OpenRead(configPath);
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
@@ -178,8 +210,26 @@ public static class RouterBenchmarkCliRunner
             throw new InvalidOperationException($"Config file '{configPath}' does not contain a Router section.");
         }
 
-        return routerSection.Deserialize<RouterOptions>(JsonOptions)
+        var routerOptions = routerSection.Deserialize<RouterOptions>(JsonOptions)
             ?? throw new InvalidOperationException($"Config file '{configPath}' Router section deserialized to null.");
+        var metricsOptions = document.RootElement.TryGetProperty(RouterMetricsOptions.SectionName, out var metricsSection)
+            ? metricsSection.Deserialize<RouterMetricsOptions>(JsonOptions)
+                ?? throw new InvalidOperationException($"Config file '{configPath}' RouterMetrics section deserialized to null.")
+            : new RouterMetricsOptions();
+
+        return new RouterBenchmarkConfig(routerOptions, metricsOptions);
+    }
+
+    private static DeterministicRouterService CreateRouter(
+        RouterOptions routerOptions,
+        RouterMetricsOptions metricsOptions)
+    {
+        var metricsStore = new InMemoryRouterMetricsStore(
+            Options.Create(metricsOptions));
+        return new DeterministicRouterService(
+            Options.Create(routerOptions),
+            Options.Create(metricsOptions),
+            metricsStore);
     }
 
     private static string FormatSelectedModel(string? provider, string? modelId, string? version) =>
@@ -190,10 +240,16 @@ public static class RouterBenchmarkCliRunner
     private static string FormatLatency(double latencyMs) =>
         latencyMs.ToString("0.0000", CultureInfo.InvariantCulture);
 
+    private static string FormatDecimal(decimal value) =>
+        value.ToString("0.######", CultureInfo.InvariantCulture);
+
+    private static string FormatNullableDecimal(decimal? value) =>
+        value is decimal score ? FormatDecimal(score) : "(none)";
+
     private static string GetUsageText() => """
         Usage: aos-replay benchmark-router --iterations <count> [--config <path>] [--warmup <count>] [--task-class <value>]
                [--max-latency-ms <value>] [--max-cost-per-1k-tokens <value>] [--min-quality-score <value>]
-               [--required-compliance-tag <value>]...
+               [--required-compliance-tag <value>]... [--compare-without-metrics]
 
         Defaults: --config source/Aos.WebApi/appsettings.json --task-class workflow.hello --warmup 1000
         Exit codes: 0=reported, 1=benchmark/config failure, 2=usage/input failure
@@ -203,6 +259,12 @@ public static class RouterBenchmarkCliRunner
         string ConfigPath,
         int Iterations,
         int WarmupIterations,
+        bool CompareWithoutMetrics,
         RouterSelectionRequest SelectionRequest
+    );
+
+    private sealed record RouterBenchmarkConfig(
+        RouterOptions RouterOptions,
+        RouterMetricsOptions MetricsOptions
     );
 }

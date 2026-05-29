@@ -234,8 +234,90 @@ public sealed class RouterServiceTests
         });
     }
 
+    [Fact]
+    public void SelectModel_WhenMetricsAreEnabled_UsesMetricsWeightedScore()
+    {
+        var options = CreateMetricsWeightingOptions();
+        var metricsOptions = new RouterMetricsOptions
+        {
+            Enabled = true,
+            BlendWeight = 1m
+        };
+        var metricsStore = new InMemoryRouterMetricsStore(
+        [
+            new RouterModelPerformanceMetric(
+                TaskClass: "metrics.weighted",
+                Provider: "openai",
+                ModelId: "model-b",
+                Version: "1",
+                ObservedLatencyMs: 100,
+                SuccessRate: 1m,
+                QualityScore: 100,
+                SampleCount: 50,
+                CapturedAtUtc: DateTimeOffset.Parse("2026-05-29T00:00:00Z"),
+                Source: "test-fixture")
+        ]);
+        var service = CreateService(options, metricsOptions, metricsStore);
+
+        var result = service.SelectModel(new RouterSelectionRequest(
+            TaskClass: "metrics.weighted",
+            MaxLatencyMs: 200,
+            MaxCostPer1KTokens: 1.0m,
+            MinQualityScore: 60,
+            RequiredComplianceTags: ["eu"]));
+
+        Assert.NotNull(result.SelectedCandidate);
+        Assert.Equal("model-b", result.SelectedCandidate!.ModelId);
+        Assert.Equal(1.0m, result.RankedCandidates[0].Score);
+    }
+
+    [Fact]
+    public void SelectModel_WhenMetricsAreDisabled_UsesStaticCandidateScore()
+    {
+        var options = CreateMetricsWeightingOptions();
+        var metricsOptions = new RouterMetricsOptions
+        {
+            Enabled = false,
+            BlendWeight = 1m
+        };
+        var metricsStore = new InMemoryRouterMetricsStore(
+        [
+            new RouterModelPerformanceMetric(
+                TaskClass: "metrics.weighted",
+                Provider: "openai",
+                ModelId: "model-b",
+                Version: "1",
+                ObservedLatencyMs: 100,
+                SuccessRate: 1m,
+                QualityScore: 100,
+                SampleCount: 50,
+                CapturedAtUtc: DateTimeOffset.Parse("2026-05-29T00:00:00Z"),
+                Source: "test-fixture")
+        ]);
+        var service = CreateService(options, metricsOptions, metricsStore);
+
+        var result = service.SelectModel(new RouterSelectionRequest(
+            TaskClass: "metrics.weighted",
+            MaxLatencyMs: 200,
+            MaxCostPer1KTokens: 1.0m,
+            MinQualityScore: 60,
+            RequiredComplianceTags: ["eu"]));
+
+        Assert.NotNull(result.SelectedCandidate);
+        Assert.Equal("model-a", result.SelectedCandidate!.ModelId);
+    }
+
     private static DeterministicRouterService CreateService(RouterOptions options)
         => new(Microsoft.Extensions.Options.Options.Create(options));
+
+    private static DeterministicRouterService CreateService(
+        RouterOptions options,
+        RouterMetricsOptions metricsOptions,
+        IRouterMetricsStore metricsStore)
+        => new(
+            Microsoft.Extensions.Options.Options.Create(options),
+            Microsoft.Extensions.Options.Options.Create(metricsOptions),
+            metricsStore);
 
     private static RouterOptions CreateDefaultOptions()
     {
@@ -282,6 +364,45 @@ public sealed class RouterServiceTests
                     QualityScore = 91,
                     ComplianceScore = 88,
                     ComplianceTags = [ "standard", "eu", "audit" ]
+                }
+            ]
+        };
+    }
+
+    private static RouterOptions CreateMetricsWeightingOptions()
+    {
+        return new RouterOptions
+        {
+            Weights = new RouterWeightsOptions
+            {
+                Latency = 0m,
+                Cost = 0m,
+                Quality = 1m,
+                Compliance = 0m
+            },
+            Candidates =
+            [
+                new RouterModelOptions
+                {
+                    ModelId = "model-a",
+                    Provider = "openai",
+                    Version = "1",
+                    LatencyMs = 100,
+                    CostPer1KTokens = 0.1m,
+                    QualityScore = 80,
+                    ComplianceScore = 90,
+                    ComplianceTags = [ "eu" ]
+                },
+                new RouterModelOptions
+                {
+                    ModelId = "model-b",
+                    Provider = "openai",
+                    Version = "1",
+                    LatencyMs = 100,
+                    CostPer1KTokens = 0.1m,
+                    QualityScore = 75,
+                    ComplianceScore = 90,
+                    ComplianceTags = [ "eu" ]
                 }
             ]
         };
