@@ -1,15 +1,22 @@
 using Aos.WebApi.Models;
 using Aos.WebApi.Options;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace Aos.WebApi.Services;
 
 public sealed class HelloWorkflowService : IHelloWorkflowService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     private readonly ISeedProvider _seedProvider;
     private readonly ITimeSource _timeSource;
     private readonly HelloWorkflowOptions _options;
     private readonly IRouterService _routerService;
+    private readonly IToolExecutor _toolExecutor;
     private readonly IEventLogIntegrityChain _eventLogIntegrityChain;
     private readonly IManifestSigner _manifestSigner;
 
@@ -18,6 +25,7 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
         ITimeSource timeSource,
         IOptions<HelloWorkflowOptions> options,
         IRouterService routerService,
+        IToolExecutor toolExecutor,
         IEventLogIntegrityChain eventLogIntegrityChain,
         IManifestSigner manifestSigner)
     {
@@ -25,6 +33,7 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
         _timeSource = timeSource;
         _options = options.Value;
         _routerService = routerService;
+        _toolExecutor = toolExecutor;
         _eventLogIntegrityChain = eventLogIntegrityChain;
         _manifestSigner = manifestSigner;
     }
@@ -43,14 +52,30 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
         var models = new[] { MapModelRef(routingDecision.SelectedCandidate!) };
         var tools = ResolveTools();
         var policyDecisions = ResolvePolicyDecisions();
+        var toolResult = ExecuteWorkflowTool(runId, tools[0]);
 
-        var entry = new EventLogEntry(
-            RunId: runId,
-            EventType: "workflow.hello",
-            Data: new { Message = "hello", ManifestVersion = SchemaVersions.CurrentManifestVersion },
-            OccurredAtUtc: now);
+        var eventLogEntries = new[]
+        {
+            new EventLogEntry(
+                RunId: runId,
+                EventType: "tool.execution",
+                Data: MapToolExecutionEvent(toolResult),
+                OccurredAtUtc: _timeSource.NowUtc()),
+            new EventLogEntry(
+                RunId: runId,
+                EventType: "workflow.hello",
+                Data: new
+                {
+                    Message = "hello",
+                    ManifestVersion = SchemaVersions.CurrentManifestVersion,
+                    ToolInvocationId = toolResult.InvocationId,
+                    ToolStatus = toolResult.Status,
+                    ToolOutputJson = toolResult.OutputJson
+                },
+                OccurredAtUtc: _timeSource.NowUtc())
+        };
 
-        var eventLogRecords = _eventLogIntegrityChain.SignEntries([entry]);
+        var eventLogRecords = _eventLogIntegrityChain.SignEntries(eventLogEntries);
         var manifest = new Manifest(
             ManifestVersion: SchemaVersions.CurrentManifestVersion,
             RunId: runId,
@@ -127,6 +152,35 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
                 RequireValue(tool.ToolId, "HelloWorkflow.Tools[].ToolId"),
                 RequireValue(tool.Version, "HelloWorkflow.Tools[].Version")))
             .ToArray();
+    }
+
+    private ToolExecutionResult ExecuteWorkflowTool(string runId, ToolRef tool)
+    {
+        var invocationId = $"{runId}:hello-tool:0";
+        var inputJson = JsonSerializer.Serialize(
+            new
+            {
+                message = "hello",
+                runId
+            },
+            JsonOptions);
+
+        return _toolExecutor.Execute(new ToolExecutionRequest(
+            InvocationId: invocationId,
+            Tool: tool,
+            InputJson: inputJson));
+    }
+
+    private static ToolExecutionEvent MapToolExecutionEvent(ToolExecutionResult result)
+    {
+        return new ToolExecutionEvent(
+            InvocationId: result.InvocationId,
+            ToolId: result.Tool.ToolId,
+            ToolVersion: result.Tool.Version,
+            Status: result.Status,
+            InputJson: result.InputJson,
+            OutputJson: result.OutputJson,
+            Error: result.Error);
     }
 
     private IReadOnlyList<PolicyDecision> ResolvePolicyDecisions()

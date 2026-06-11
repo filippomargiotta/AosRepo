@@ -15,13 +15,14 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
         IManifestSigner manifestSigner)
     {
         var replayTimeSource = new ReplayTimeSource(
-            expectedRecords.Select(record => record.Entry.OccurredAtUtc),
+            [ manifest.StartedAtUtc, .. expectedRecords.Select(record => record.Entry.OccurredAtUtc) ],
             manifest.TimeSource);
         var service = new HelloWorkflowService(
             new FixedSeedProvider(manifest.Seed),
             replayTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateOptionsFromManifest(manifest)),
             new FixedRouterService(manifest.RoutingDecisions.Single()),
+            new DeterministicEchoToolExecutor(),
             eventLogIntegrityChain,
             manifestSigner);
 

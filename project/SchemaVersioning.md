@@ -28,6 +28,7 @@
 - The event log line count must match `manifest.eventLog.recordCount`.
 - The event log tail `chainMac` must match `manifest.eventLog.lastChainMac`.
 - Replay uses the recorded routing decision instead of re-evaluating live router configuration, so historical artifacts stay reproducible after policy/candidate changes.
+- Event-log schema `0.2` can carry domain event payloads such as `tool.execution`; adding the June tool I/O event did not change the signed event-log envelope.
 - Workflow selection is still CLI-driven and is not yet encoded into the manifest schema.
 
 ## Change policy

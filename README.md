@@ -2,7 +2,7 @@
 
 ## Replay CLI
 
-The replay CLI validates signed manifest integrity, validates event-log integrity, checks artifact compatibility, and replays the `hello` workflow artifacts.
+The replay CLI validates signed manifest integrity, validates event-log integrity, checks artifact compatibility, and replays the `hello` workflow artifacts. The current `hello` golden scenario includes a deterministic tool execution event, so replay also compares captured tool input/output.
 
 Run from repo root:
 

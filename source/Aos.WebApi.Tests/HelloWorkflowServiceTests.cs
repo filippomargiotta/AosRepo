@@ -56,6 +56,7 @@ public sealed class HelloWorkflowServiceTests
                 ]
             }),
             CreateRouterService(),
+            new DeterministicEchoToolExecutor(),
             CreateIntegrityChain(),
             CreateManifestSigner());
 
@@ -69,9 +70,20 @@ public sealed class HelloWorkflowServiceTests
         Assert.Equal(
             new[] { new PolicyDecision("allow-approved-tools", "allow", "configured default policy") },
             artifacts.Manifest.PolicyDecisions);
-        Assert.Equal(SchemaVersions.CurrentEventLogSchemaVersion, artifacts.EventLogRecords.Single().SchemaVersion);
-        Assert.Equal(1, artifacts.Manifest.EventLog.RecordCount);
-        Assert.Equal(artifacts.EventLogRecords.Single().Integrity.ChainMac, artifacts.Manifest.EventLog.LastChainMac);
+        Assert.Equal(2, artifacts.EventLogRecords.Count);
+        Assert.All(
+            artifacts.EventLogRecords,
+            record => Assert.Equal(SchemaVersions.CurrentEventLogSchemaVersion, record.SchemaVersion));
+        Assert.Equal("tool.execution", artifacts.EventLogRecords[0].Entry.EventType);
+        Assert.Equal("workflow.hello", artifacts.EventLogRecords[1].Entry.EventType);
+        var toolEvent = Assert.IsType<ToolExecutionEvent>(artifacts.EventLogRecords[0].Entry.Data);
+        Assert.Equal("run-1:hello-tool:0", toolEvent.InvocationId);
+        Assert.Equal("web-search", toolEvent.ToolId);
+        Assert.Equal("1.0", toolEvent.ToolVersion);
+        Assert.Equal("succeeded", toolEvent.Status);
+        Assert.Equal(toolEvent.InputJson, toolEvent.OutputJson);
+        Assert.Equal(2, artifacts.Manifest.EventLog.RecordCount);
+        Assert.Equal(artifacts.EventLogRecords[^1].Integrity.ChainMac, artifacts.Manifest.EventLog.LastChainMac);
         Assert.True(CreateManifestSigner().TryValidateRecord(artifacts.ManifestRecord, out var error));
         Assert.Null(error);
     }
@@ -103,6 +115,25 @@ public sealed class HelloWorkflowServiceTests
         Assert.Equal(["openai-gpt-4.1-mini"], artifacts.Manifest.Models.Select(m => m.ModelId));
         Assert.Equal(["tool-2", "tool-1"], artifacts.Manifest.Tools.Select(t => t.ToolId));
         Assert.Equal(["policy-z", "policy-a"], artifacts.Manifest.PolicyDecisions.Select(p => p.PolicyId));
+    }
+
+    [Fact]
+    public void CreateHelloArtifacts_WhenToolOutputChanges_ChangesCapturedToolEvent()
+    {
+        var options = CreateValidOptions();
+        var baseline = CreateService(options, new DeterministicEchoToolExecutor())
+            .CreateHelloArtifacts("run-tool-drift");
+        var changed = CreateService(options, new FixedOutputToolExecutor("{\"message\":\"HELLO-MISMATCH\"}"))
+            .CreateHelloArtifacts("run-tool-drift");
+
+        var baselineToolEvent = Assert.IsType<ToolExecutionEvent>(baseline.EventLogRecords[0].Entry.Data);
+        var changedToolEvent = Assert.IsType<ToolExecutionEvent>(changed.EventLogRecords[0].Entry.Data);
+
+        Assert.Equal("{\"message\":\"hello\",\"runId\":\"run-tool-drift\"}", baselineToolEvent.OutputJson);
+        Assert.Equal("{\"message\":\"HELLO-MISMATCH\"}", changedToolEvent.OutputJson);
+        Assert.NotEqual(
+            baseline.EventLogRecords[0].Integrity.ChainMac,
+            changed.EventLogRecords[0].Integrity.ChainMac);
     }
 
     [Fact]
@@ -140,6 +171,7 @@ public sealed class HelloWorkflowServiceTests
                 new TimeSourceInfo("record", "stub", "clock-1", "utc-millis", null)),
             Microsoft.Extensions.Options.Options.Create(CreateValidOptions()),
             new FixedRouterService(CreateRoutingResult(hasSelection: false)),
+            new DeterministicEchoToolExecutor(),
             CreateIntegrityChain(),
             CreateManifestSigner());
 
@@ -148,7 +180,7 @@ public sealed class HelloWorkflowServiceTests
         Assert.Contains("Router did not select a model", ex.Message);
     }
 
-    private static HelloWorkflowService CreateService(HelloWorkflowOptions options)
+    private static HelloWorkflowService CreateService(HelloWorkflowOptions options, IToolExecutor? toolExecutor = null)
     {
         return new HelloWorkflowService(
             new FixedSeedProvider(new SeedInfo("seed-fixed", "test", 1, "test")),
@@ -157,6 +189,7 @@ public sealed class HelloWorkflowServiceTests
                 new TimeSourceInfo("record", "stub", "clock-1", "utc-millis", null)),
             Microsoft.Extensions.Options.Options.Create(options),
             CreateRouterService(),
+            toolExecutor ?? new DeterministicEchoToolExecutor(),
             CreateIntegrityChain(),
             CreateManifestSigner());
     }
@@ -206,4 +239,25 @@ public sealed class HelloWorkflowServiceTests
 
     private static IManifestSigner CreateManifestSigner() =>
         new HmacManifestSigner(TestHmacKey, TestHmacKeyId);
+
+    private sealed class FixedOutputToolExecutor : IToolExecutor
+    {
+        private readonly string _outputJson;
+
+        public FixedOutputToolExecutor(string outputJson)
+        {
+            _outputJson = outputJson;
+        }
+
+        public ToolExecutionResult Execute(ToolExecutionRequest request)
+        {
+            return new ToolExecutionResult(
+                InvocationId: request.InvocationId,
+                Tool: request.Tool,
+                Status: "succeeded",
+                InputJson: request.InputJson,
+                OutputJson: _outputJson,
+                Error: null);
+        }
+    }
 }

@@ -46,6 +46,7 @@ builder.Services.AddSingleton<IManifestSigner>(serviceProvider =>
 builder.Services.AddSingleton<ISeedGenerator, RandomSeedGenerator>();
 builder.Services.AddSingleton<ISeedProvider, LockedSeedProvider>();
 builder.Services.AddSingleton<ITimeSource, SystemTimeSource>();
+builder.Services.AddSingleton<IToolExecutor, DeterministicEchoToolExecutor>();
 builder.Services.AddSingleton<IHelloWorkflowService, HelloWorkflowService>();
 builder.Services.AddSingleton<IRouterService, DeterministicRouterService>();
 builder.Services.AddSingleton<IRouterMetricsStore, InMemoryRouterMetricsStore>();

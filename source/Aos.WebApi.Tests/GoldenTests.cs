@@ -21,7 +21,7 @@ public sealed class GoldenTests
     public void RecordHelloWorkflow_MatchesCheckedInGoldenArtifacts()
     {
         var recordTimeSource = new RecordingTimeSource(new FixedSequenceTimeSource(
-            [GoldenInstant],
+            [GoldenInstant, GoldenInstant, GoldenInstant],
             new TimeSourceInfo(
                 Mode: "record",
                 Source: "golden-fixed",
@@ -34,12 +34,13 @@ public sealed class GoldenTests
             recordTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
             new FixedRouterService(CreateGoldenRoutingDecision()),
+            new DeterministicEchoToolExecutor(),
             CreateIntegrityChain(),
             CreateManifestSigner());
 
         var artifacts = service.CreateHelloArtifacts(GoldenRunId);
 
-        Assert.Equal([GoldenInstant], recordTimeSource.GetRecordedInstants());
+        Assert.Equal([GoldenInstant, GoldenInstant, GoldenInstant], recordTimeSource.GetRecordedInstants());
         Assert.Equal(GoldenArtifactTestSupport.ReadGoldenManifestJson(), GoldenArtifactTestSupport.SerializeManifestRecord(artifacts.ManifestRecord));
         Assert.Equal(GoldenArtifactTestSupport.ReadGoldenEventLogJsonl(), GoldenArtifactTestSupport.SerializeEventLogLines(artifacts.EventLogRecords));
     }
@@ -51,13 +52,17 @@ public sealed class GoldenTests
         var goldenEventLogRecords = GoldenArtifactTestSupport.ReadGoldenEventLogRecords();
 
         var replayTimeSource = new ReplayTimeSource(
-            [goldenManifestRecord.Manifest.StartedAtUtc],
+            [
+                goldenManifestRecord.Manifest.StartedAtUtc,
+                .. goldenEventLogRecords.Select(record => record.Entry.OccurredAtUtc)
+            ],
             goldenManifestRecord.Manifest.TimeSource);
         var service = new HelloWorkflowService(
             new FixedSeedProvider(goldenManifestRecord.Manifest.Seed, preserveSeedId: true),
             replayTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
             new FixedRouterService(goldenManifestRecord.Manifest.RoutingDecisions.Single()),
+            new DeterministicEchoToolExecutor(),
             CreateIntegrityChain(),
             CreateManifestSigner());
 

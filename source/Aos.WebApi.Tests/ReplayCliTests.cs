@@ -57,12 +57,20 @@ public sealed class ReplayCliTests
             var eventLogPath = Path.Combine(tempDir, "eventlog.jsonl");
             File.Copy(GoldenArtifactTestSupport.GetGoldenPath("manifest.json"), manifestPath);
 
-            var entry = new EventLogEntry(
-                RunId: "run-golden-hello-1",
-                EventType: "workflow.hello",
-                Data: new { message = "HELLO-MISMATCH", manifestVersion = SchemaVersions.CurrentManifestVersion },
-                OccurredAtUtc: new DateTimeOffset(2026, 2, 26, 19, 0, 0, TimeSpan.Zero));
-            var records = new HmacEventLogIntegrityChain(TestHmacKey, TestHmacKeyId).SignEntries([entry]);
+            var entries = GoldenArtifactTestSupport.ReadGoldenEventLogRecords()
+                .Select(record => record.Entry)
+                .ToArray();
+            var expectedToolEvent = JsonSerializer.Deserialize<ToolExecutionEvent>(
+                JsonSerializer.Serialize(entries[0].Data, GoldenArtifactTestSupport.JsonOptions),
+                GoldenArtifactTestSupport.JsonOptions)!;
+            entries[0] = entries[0] with
+            {
+                Data = expectedToolEvent with
+                {
+                    OutputJson = "{\"message\":\"HELLO-MISMATCH\",\"runId\":\"run-golden-hello-1\"}"
+                }
+            };
+            var records = new HmacEventLogIntegrityChain(TestHmacKey, TestHmacKeyId).SignEntries(entries);
             var manifest = GoldenArtifactTestSupport.ReadGoldenManifestRecord().Manifest with
             {
                 EventLog = new EventLogSummary(records[0].SchemaVersion, records.Count, records[^1].Integrity.ChainMac)
@@ -85,7 +93,7 @@ public sealed class ReplayCliTests
 
             Assert.Equal(1, exitCode);
             Assert.Contains(
-                "Mismatch: Event log line 1 field data.message differs: expected \"HELLO-MISMATCH\", actual \"hello\".",
+                "Mismatch: Manifest field manifest.eventLog.lastChainMac differs:",
                 stderr.ToString());
         }
         finally
@@ -309,16 +317,27 @@ public sealed class ReplayCliTests
             var eventLogPath = Path.Combine(tempDir, "eventlog.jsonl");
             File.Copy(GoldenArtifactTestSupport.GetGoldenPath("manifest.json"), manifestPath);
 
-            var tamperedRecord = GoldenArtifactTestSupport.ReadGoldenEventLogRecords().Single() with
+            var records = GoldenArtifactTestSupport.ReadGoldenEventLogRecords().ToArray();
+            var tamperedRecord = records[0] with
             {
-                Entry = GoldenArtifactTestSupport.ReadGoldenEventLogRecords().Single().Entry with
+                Entry = records[0].Entry with
                 {
-                    Data = new { message = "tampered", manifestVersion = SchemaVersions.CurrentManifestVersion }
+                    Data = new
+                    {
+                        invocationId = "run-golden-hello-1:hello-tool:0",
+                        toolId = "noop",
+                        toolVersion = "0.0",
+                        status = "succeeded",
+                        inputJson = "{\"message\":\"hello\",\"runId\":\"run-golden-hello-1\"}",
+                        outputJson = "{\"message\":\"tampered\",\"runId\":\"run-golden-hello-1\"}",
+                        error = (string?)null
+                    }
                 }
             };
+            records[0] = tamperedRecord;
             await File.WriteAllTextAsync(
                 eventLogPath,
-                JsonSerializer.Serialize(tamperedRecord, GoldenArtifactTestSupport.JsonOptions) + "\n");
+                GoldenArtifactTestSupport.SerializeEventLogLines(records));
 
             using var stdout = new StringWriter();
             using var stderr = new StringWriter();
@@ -411,7 +430,7 @@ public sealed class ReplayCliTests
 
             Assert.Equal(1, exitCode);
             Assert.Contains(
-                "Artifact compatibility failed: Manifest eventLog recordCount '99' does not match event log line count '1'.",
+                "Artifact compatibility failed: Manifest eventLog recordCount '99' does not match event log line count '2'.",
                 stderr.ToString());
             Assert.Contains(
                 "Artifact compatibility failed: Manifest eventLog lastChainMac 'mismatch-chain-mac' does not match event log tail chainMac",
