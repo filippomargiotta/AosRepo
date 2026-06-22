@@ -16,6 +16,7 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
     private readonly ITimeSource _timeSource;
     private readonly HelloWorkflowOptions _options;
     private readonly IRouterService _routerService;
+    private readonly ICapabilityTokenIssuer _capabilityTokenIssuer;
     private readonly IToolExecutor _toolExecutor;
     private readonly IEventLogIntegrityChain _eventLogIntegrityChain;
     private readonly IManifestSigner _manifestSigner;
@@ -25,6 +26,7 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
         ITimeSource timeSource,
         IOptions<HelloWorkflowOptions> options,
         IRouterService routerService,
+        ICapabilityTokenIssuer capabilityTokenIssuer,
         IToolExecutor toolExecutor,
         IEventLogIntegrityChain eventLogIntegrityChain,
         IManifestSigner manifestSigner)
@@ -33,6 +35,7 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
         _timeSource = timeSource;
         _options = options.Value;
         _routerService = routerService;
+        _capabilityTokenIssuer = capabilityTokenIssuer;
         _toolExecutor = toolExecutor;
         _eventLogIntegrityChain = eventLogIntegrityChain;
         _manifestSigner = manifestSigner;
@@ -51,8 +54,8 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
         var routingDecision = ResolveRoutingDecision();
         var models = new[] { MapModelRef(routingDecision.SelectedCandidate!) };
         var tools = ResolveTools();
-        var policyDecisions = ResolvePolicyDecisions();
-        var toolResult = ExecuteWorkflowTool(runId, tools[0]);
+        var toolResult = ExecuteWorkflowTool(runId, tools[0], now);
+        var policyDecisions = ResolvePolicyDecisions(toolResult.CapabilityDecision!);
 
         var eventLogEntries = new[]
         {
@@ -154,9 +157,13 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
             .ToArray();
     }
 
-    private ToolExecutionResult ExecuteWorkflowTool(string runId, ToolRef tool)
+    private ToolExecutionResult ExecuteWorkflowTool(
+        string runId,
+        ToolRef tool,
+        DateTimeOffset requestedAtUtc)
     {
         var invocationId = $"{runId}:hello-tool:0";
+        const string action = "tool.execute";
         var inputJson = JsonSerializer.Serialize(
             new
             {
@@ -164,11 +171,22 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
                 runId
             },
             JsonOptions);
+        var scope = new ToolCapabilityScope(
+            runId,
+            invocationId,
+            tool.ToolId,
+            tool.Version,
+            action);
+        var capabilityToken = _capabilityTokenIssuer.Issue(scope, requestedAtUtc);
 
         return _toolExecutor.Execute(new ToolExecutionRequest(
+            RunId: runId,
             InvocationId: invocationId,
             Tool: tool,
-            InputJson: inputJson));
+            Action: action,
+            InputJson: inputJson,
+            CapabilityToken: capabilityToken,
+            RequestedAtUtc: requestedAtUtc));
     }
 
     private static ToolExecutionEvent MapToolExecutionEvent(ToolExecutionResult result)
@@ -180,10 +198,12 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
             Status: result.Status,
             InputJson: result.InputJson,
             OutputJson: result.OutputJson,
-            Error: result.Error);
+            Error: result.Error,
+            CapabilityDecision: result.CapabilityDecision ?? throw new InvalidOperationException(
+                "Tool execution result must include a capability decision."));
     }
 
-    private IReadOnlyList<PolicyDecision> ResolvePolicyDecisions()
+    private IReadOnlyList<PolicyDecision> ResolvePolicyDecisions(CapabilityDecision capabilityDecision)
     {
         if (_options.PolicyDecisions.Count == 0)
         {
@@ -194,6 +214,10 @@ public sealed class HelloWorkflowService : IHelloWorkflowService
                 RequireValue(policy.PolicyId, "HelloWorkflow.PolicyDecisions[].PolicyId"),
                 RequireValue(policy.Decision, "HelloWorkflow.PolicyDecisions[].Decision"),
                 policy.Reason))
+            .Append(new PolicyDecision(
+                capabilityDecision.PolicyId,
+                capabilityDecision.Decision,
+                capabilityDecision.ReasonCode))
             .ToArray();
     }
 

@@ -20,6 +20,7 @@ public sealed class GoldenTests
     [Fact]
     public void RecordHelloWorkflow_MatchesCheckedInGoldenArtifacts()
     {
+        var capabilityTokenService = CapabilityTestData.CreateTokenService();
         var recordTimeSource = new RecordingTimeSource(new FixedSequenceTimeSource(
             [GoldenInstant, GoldenInstant, GoldenInstant],
             new TimeSourceInfo(
@@ -34,7 +35,8 @@ public sealed class GoldenTests
             recordTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
             new FixedRouterService(CreateGoldenRoutingDecision()),
-            new DeterministicEchoToolExecutor(),
+            capabilityTokenService,
+            CapabilityTestData.CreateEnforcingExecutor(capabilityTokenService),
             CreateIntegrityChain(),
             CreateManifestSigner());
 
@@ -48,6 +50,7 @@ public sealed class GoldenTests
     [Fact]
     public void ReplayHelloWorkflow_FromGoldenArtifacts_ReproducesDeterministicOutput()
     {
+        var capabilityTokenService = CapabilityTestData.CreateTokenService();
         var goldenManifestRecord = GoldenArtifactTestSupport.ReadGoldenManifestRecord();
         var goldenEventLogRecords = GoldenArtifactTestSupport.ReadGoldenEventLogRecords();
 
@@ -62,7 +65,8 @@ public sealed class GoldenTests
             replayTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
             new FixedRouterService(goldenManifestRecord.Manifest.RoutingDecisions.Single()),
-            new DeterministicEchoToolExecutor(),
+            capabilityTokenService,
+            CapabilityTestData.CreateEnforcingExecutor(capabilityTokenService),
             CreateIntegrityChain(),
             CreateManifestSigner());
 

@@ -85,7 +85,7 @@ This file captures the month-by-month plan to implement **AocWebApi** (Agentic O
 
 ### Deliverables
 - Pre-warmed isolation pool (gVisor/Firecracker style)
-- JWT capability tokens + enforcement at API gateway
+- JWT capability tokens issued by the orchestration boundary and enforced at the tool-execution gateway
 - Tool execution protocol (inputs/outputs captured for replay)
 
 ### Definition of Done (DoD)

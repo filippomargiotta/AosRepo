@@ -6,6 +6,8 @@ namespace Aos.ReplayCli;
 
 internal sealed class HelloReplayWorkflow : IReplayWorkflow
 {
+    private const string ReplayCapabilityKey = "replay-capability-key-at-least-32-bytes";
+
     public string WorkflowName => "hello";
 
     public ReplayWorkflowArtifacts Replay(
@@ -17,12 +19,16 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
         var replayTimeSource = new ReplayTimeSource(
             [ manifest.StartedAtUtc, .. expectedRecords.Select(record => record.Entry.OccurredAtUtc) ],
             manifest.TimeSource);
+        var capabilityTokenService = CreateCapabilityTokenService();
         var service = new HelloWorkflowService(
             new FixedSeedProvider(manifest.Seed),
             replayTimeSource,
             Microsoft.Extensions.Options.Options.Create(CreateOptionsFromManifest(manifest)),
             new FixedRouterService(manifest.RoutingDecisions.Single()),
-            new DeterministicEchoToolExecutor(),
+            capabilityTokenService,
+            new CapabilityEnforcingToolExecutor(
+                capabilityTokenService,
+                new DeterministicEchoToolExecutor()),
             eventLogIntegrityChain,
             manifestSigner);
 
@@ -59,6 +65,10 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
                 })
                 .ToList(),
             PolicyDecisions = manifest.PolicyDecisions
+                .Where(policy => !string.Equals(
+                    policy.PolicyId,
+                    HmacJwtCapabilityTokenService.PolicyId,
+                    StringComparison.Ordinal))
                 .Select(policy => new HelloWorkflowPolicyOptions
                 {
                     PolicyId = policy.PolicyId,
@@ -68,6 +78,16 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
                 .ToList()
         };
     }
+
+    private static HmacJwtCapabilityTokenService CreateCapabilityTokenService() =>
+        new(Microsoft.Extensions.Options.Options.Create(new CapabilityTokenOptions
+        {
+            Issuer = "aos.replay",
+            Audience = "aos.tools",
+            SigningKey = ReplayCapabilityKey,
+            KeyId = "replay-capability-v1",
+            LifetimeSeconds = 300
+        }));
 
     private sealed class FixedSeedProvider : ISeedProvider
     {

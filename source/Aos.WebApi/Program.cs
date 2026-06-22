@@ -27,6 +27,8 @@ builder.Services.Configure<RouterOptions>(
     builder.Configuration.GetSection(RouterOptions.SectionName));
 builder.Services.Configure<RouterMetricsOptions>(
     builder.Configuration.GetSection(RouterMetricsOptions.SectionName));
+builder.Services.Configure<CapabilityTokenOptions>(
+    builder.Configuration.GetSection(CapabilityTokenOptions.SectionName));
 builder.Services.AddSingleton<IEventLogWriter, FileEventLogWriter>();
 builder.Services.AddSingleton<IManifestWriter, FileManifestWriter>();
 builder.Services.AddSingleton<IEventLogIntegrityChain>(serviceProvider =>
@@ -46,7 +48,16 @@ builder.Services.AddSingleton<IManifestSigner>(serviceProvider =>
 builder.Services.AddSingleton<ISeedGenerator, RandomSeedGenerator>();
 builder.Services.AddSingleton<ISeedProvider, LockedSeedProvider>();
 builder.Services.AddSingleton<ITimeSource, SystemTimeSource>();
-builder.Services.AddSingleton<IToolExecutor, DeterministicEchoToolExecutor>();
+builder.Services.AddSingleton<HmacJwtCapabilityTokenService>();
+builder.Services.AddSingleton<ICapabilityTokenIssuer>(serviceProvider =>
+    serviceProvider.GetRequiredService<HmacJwtCapabilityTokenService>());
+builder.Services.AddSingleton<ICapabilityTokenValidator>(serviceProvider =>
+    serviceProvider.GetRequiredService<HmacJwtCapabilityTokenService>());
+builder.Services.AddSingleton<DeterministicEchoToolExecutor>();
+builder.Services.AddSingleton<IToolExecutor>(serviceProvider =>
+    new CapabilityEnforcingToolExecutor(
+        serviceProvider.GetRequiredService<ICapabilityTokenValidator>(),
+        serviceProvider.GetRequiredService<DeterministicEchoToolExecutor>()));
 builder.Services.AddSingleton<IHelloWorkflowService, HelloWorkflowService>();
 builder.Services.AddSingleton<IRouterService, DeterministicRouterService>();
 builder.Services.AddSingleton<IRouterMetricsStore, InMemoryRouterMetricsStore>();

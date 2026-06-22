@@ -16,6 +16,8 @@ dotnet run --project source/Aos.ReplayCli -- \
 
 Expected result: exit code `0` and a replay verification success message when artifacts match.
 
+Tool execution is protected by a short-lived invocation-specific JWT capability. The token is validated immediately before `IToolExecutor` delegates work, while signed artifacts record only the allow/deny decision and non-secret token id; raw JWTs are not persisted.
+
 You can also point replay at a per-run artifact directory instead of passing both files explicitly:
 
 ```bash

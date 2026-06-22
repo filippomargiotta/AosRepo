@@ -1,6 +1,7 @@
 using Aos.WebApi.Models;
 using Aos.WebApi.Options;
 using Aos.WebApi.Services;
+using System.Text.Json;
 using Xunit;
 
 namespace Aos.WebApi.Tests;
@@ -13,6 +14,7 @@ public sealed class HelloWorkflowServiceTests
     [Fact]
     public void CreateHelloArtifacts_UsesRouterSelectedModelAndConfiguredToolsAndPolicies()
     {
+        var capabilityTokenService = CapabilityTestData.CreateTokenService();
         var service = new HelloWorkflowService(
             new FixedSeedProvider(new SeedInfo("seed-run-1", "test", 123, "test")),
             new FixedTimeSource(
@@ -56,7 +58,8 @@ public sealed class HelloWorkflowServiceTests
                 ]
             }),
             CreateRouterService(),
-            new DeterministicEchoToolExecutor(),
+            capabilityTokenService,
+            CapabilityTestData.CreateEnforcingExecutor(capabilityTokenService),
             CreateIntegrityChain(),
             CreateManifestSigner());
 
@@ -68,7 +71,11 @@ public sealed class HelloWorkflowServiceTests
         Assert.Equal("openai-gpt-4.1-mini", artifacts.Manifest.RoutingDecisions.Single().SelectedCandidate!.ModelId);
         Assert.Equal(new[] { new ToolRef("web-search", "1.0") }, artifacts.Manifest.Tools);
         Assert.Equal(
-            new[] { new PolicyDecision("allow-approved-tools", "allow", "configured default policy") },
+            new[]
+            {
+                new PolicyDecision("allow-approved-tools", "allow", "configured default policy"),
+                new PolicyDecision("capability-token-v1", "allow", "capability_valid")
+            },
             artifacts.Manifest.PolicyDecisions);
         Assert.Equal(2, artifacts.EventLogRecords.Count);
         Assert.All(
@@ -82,6 +89,9 @@ public sealed class HelloWorkflowServiceTests
         Assert.Equal("1.0", toolEvent.ToolVersion);
         Assert.Equal("succeeded", toolEvent.Status);
         Assert.Equal(toolEvent.InputJson, toolEvent.OutputJson);
+        Assert.Equal("allow", toolEvent.CapabilityDecision.Decision);
+        Assert.Equal("capability_valid", toolEvent.CapabilityDecision.ReasonCode);
+        Assert.Equal("cap:run-1:hello-tool:0", toolEvent.CapabilityDecision.TokenId);
         Assert.Equal(2, artifacts.Manifest.EventLog.RecordCount);
         Assert.Equal(artifacts.EventLogRecords[^1].Integrity.ChainMac, artifacts.Manifest.EventLog.LastChainMac);
         Assert.True(CreateManifestSigner().TryValidateRecord(artifacts.ManifestRecord, out var error));
@@ -114,7 +124,9 @@ public sealed class HelloWorkflowServiceTests
 
         Assert.Equal(["openai-gpt-4.1-mini"], artifacts.Manifest.Models.Select(m => m.ModelId));
         Assert.Equal(["tool-2", "tool-1"], artifacts.Manifest.Tools.Select(t => t.ToolId));
-        Assert.Equal(["policy-z", "policy-a"], artifacts.Manifest.PolicyDecisions.Select(p => p.PolicyId));
+        Assert.Equal(
+            ["policy-z", "policy-a", HmacJwtCapabilityTokenService.PolicyId],
+            artifacts.Manifest.PolicyDecisions.Select(p => p.PolicyId));
     }
 
     [Fact]
@@ -134,6 +146,60 @@ public sealed class HelloWorkflowServiceTests
         Assert.NotEqual(
             baseline.EventLogRecords[0].Integrity.ChainMac,
             changed.EventLogRecords[0].Integrity.ChainMac);
+    }
+
+    [Fact]
+    public void CreateHelloArtifacts_WithInvalidCapability_RecordsDenialWithoutExecutingTool()
+    {
+        const string rawToken = "raw-capability-token-must-not-be-persisted";
+        var innerExecutor = new TrackingToolExecutor();
+        var tokenService = CapabilityTestData.CreateTokenService();
+        var service = CreateService(
+            CreateValidOptions(),
+            innerExecutor,
+            new FixedCapabilityTokenIssuer(rawToken),
+            tokenService);
+
+        var artifacts = service.CreateHelloArtifacts("run-denied");
+
+        var toolEvent = Assert.IsType<ToolExecutionEvent>(artifacts.EventLogRecords[0].Entry.Data);
+        Assert.Equal("denied", toolEvent.Status);
+        Assert.Equal("deny", toolEvent.CapabilityDecision.Decision);
+        Assert.Equal("malformed_token", toolEvent.CapabilityDecision.ReasonCode);
+        Assert.Equal(0, innerExecutor.CallCount);
+        Assert.Equal(
+            new PolicyDecision("capability-token-v1", "deny", "malformed_token"),
+            artifacts.Manifest.PolicyDecisions[^1]);
+
+        var artifactJson = JsonSerializer.Serialize(new
+        {
+            artifacts.ManifestRecord,
+            artifacts.EventLogRecords
+        });
+        Assert.DoesNotContain(rawToken, artifactJson, StringComparison.Ordinal);
+        Assert.True(CreateManifestSigner().TryValidateRecord(artifacts.ManifestRecord, out _));
+        Assert.True(CreateIntegrityChain().TryValidateRecords(artifacts.EventLogRecords, out _));
+    }
+
+    [Fact]
+    public void CreateHelloArtifacts_WithValidCapability_DoesNotPersistRawToken()
+    {
+        var tokenService = CapabilityTestData.CreateTokenService();
+        var capturingIssuer = new CapturingCapabilityTokenIssuer(tokenService);
+        var service = CreateService(
+            CreateValidOptions(),
+            capabilityTokenIssuer: capturingIssuer,
+            capabilityTokenValidator: tokenService);
+
+        var artifacts = service.CreateHelloArtifacts("run-token-redaction");
+
+        Assert.NotNull(capturingIssuer.LastToken);
+        var artifactJson = JsonSerializer.Serialize(new
+        {
+            artifacts.ManifestRecord,
+            artifacts.EventLogRecords
+        });
+        Assert.DoesNotContain(capturingIssuer.LastToken, artifactJson, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -164,6 +230,7 @@ public sealed class HelloWorkflowServiceTests
     [Fact]
     public void CreateHelloArtifacts_WhenRouterHasNoSelection_Throws()
     {
+        var capabilityTokenService = CapabilityTestData.CreateTokenService();
         var service = new HelloWorkflowService(
             new FixedSeedProvider(new SeedInfo("seed-run-1", "test", 123, "test")),
             new FixedTimeSource(
@@ -171,7 +238,8 @@ public sealed class HelloWorkflowServiceTests
                 new TimeSourceInfo("record", "stub", "clock-1", "utc-millis", null)),
             Microsoft.Extensions.Options.Options.Create(CreateValidOptions()),
             new FixedRouterService(CreateRoutingResult(hasSelection: false)),
-            new DeterministicEchoToolExecutor(),
+            capabilityTokenService,
+            CapabilityTestData.CreateEnforcingExecutor(capabilityTokenService),
             CreateIntegrityChain(),
             CreateManifestSigner());
 
@@ -180,8 +248,13 @@ public sealed class HelloWorkflowServiceTests
         Assert.Contains("Router did not select a model", ex.Message);
     }
 
-    private static HelloWorkflowService CreateService(HelloWorkflowOptions options, IToolExecutor? toolExecutor = null)
+    private static HelloWorkflowService CreateService(
+        HelloWorkflowOptions options,
+        IToolExecutor? toolExecutor = null,
+        ICapabilityTokenIssuer? capabilityTokenIssuer = null,
+        ICapabilityTokenValidator? capabilityTokenValidator = null)
     {
+        var capabilityTokenService = CapabilityTestData.CreateTokenService();
         return new HelloWorkflowService(
             new FixedSeedProvider(new SeedInfo("seed-fixed", "test", 1, "test")),
             new FixedTimeSource(
@@ -189,7 +262,10 @@ public sealed class HelloWorkflowServiceTests
                 new TimeSourceInfo("record", "stub", "clock-1", "utc-millis", null)),
             Microsoft.Extensions.Options.Options.Create(options),
             CreateRouterService(),
-            toolExecutor ?? new DeterministicEchoToolExecutor(),
+            capabilityTokenIssuer ?? capabilityTokenService,
+            new CapabilityEnforcingToolExecutor(
+                capabilityTokenValidator ?? capabilityTokenService,
+                toolExecutor ?? new DeterministicEchoToolExecutor()),
             CreateIntegrityChain(),
             CreateManifestSigner());
     }
@@ -258,6 +334,53 @@ public sealed class HelloWorkflowServiceTests
                 InputJson: request.InputJson,
                 OutputJson: _outputJson,
                 Error: null);
+        }
+    }
+
+    private sealed class TrackingToolExecutor : IToolExecutor
+    {
+        public int CallCount { get; private set; }
+
+        public ToolExecutionResult Execute(ToolExecutionRequest request)
+        {
+            CallCount++;
+            return new ToolExecutionResult(
+                request.InvocationId,
+                request.Tool,
+                "succeeded",
+                request.InputJson,
+                request.InputJson,
+                null);
+        }
+    }
+
+    private sealed class FixedCapabilityTokenIssuer : ICapabilityTokenIssuer
+    {
+        private readonly string _token;
+
+        public FixedCapabilityTokenIssuer(string token)
+        {
+            _token = token;
+        }
+
+        public string Issue(ToolCapabilityScope scope, DateTimeOffset issuedAtUtc) => _token;
+    }
+
+    private sealed class CapturingCapabilityTokenIssuer : ICapabilityTokenIssuer
+    {
+        private readonly ICapabilityTokenIssuer _inner;
+
+        public CapturingCapabilityTokenIssuer(ICapabilityTokenIssuer inner)
+        {
+            _inner = inner;
+        }
+
+        public string? LastToken { get; private set; }
+
+        public string Issue(ToolCapabilityScope scope, DateTimeOffset issuedAtUtc)
+        {
+            LastToken = _inner.Issue(scope, issuedAtUtc);
+            return LastToken;
         }
     }
 }

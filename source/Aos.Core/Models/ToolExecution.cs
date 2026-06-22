@@ -1,9 +1,13 @@
 namespace Aos.WebApi.Models;
 
 public sealed record ToolExecutionRequest(
+    string RunId,
     string InvocationId,
     ToolRef Tool,
-    string InputJson
+    string Action,
+    string InputJson,
+    string CapabilityToken,
+    DateTimeOffset RequestedAtUtc
 );
 
 public sealed record ToolExecutionResult(
@@ -12,7 +16,8 @@ public sealed record ToolExecutionResult(
     string Status,
     string InputJson,
     string OutputJson,
-    string? Error
+    string? Error,
+    CapabilityDecision? CapabilityDecision = null
 );
 
 public sealed record ToolExecutionEvent(
@@ -22,5 +27,21 @@ public sealed record ToolExecutionEvent(
     string Status,
     string InputJson,
     string OutputJson,
-    string? Error
+    string? Error,
+    CapabilityDecision CapabilityDecision
+);
+
+public sealed record ToolCapabilityScope(
+    string RunId,
+    string InvocationId,
+    string ToolId,
+    string ToolVersion,
+    string Action
+);
+
+public sealed record CapabilityDecision(
+    string PolicyId,
+    string Decision,
+    string ReasonCode,
+    string? TokenId
 );
