@@ -17,7 +17,8 @@ public sealed record ToolExecutionResult(
     string InputJson,
     string OutputJson,
     string? Error,
-    CapabilityDecision? CapabilityDecision = null
+    CapabilityDecision? CapabilityDecision = null,
+    SandboxExecutionInfo? SandboxExecution = null
 );
 
 public sealed record ToolExecutionEvent(

@@ -78,3 +78,30 @@ dotnet run --project source/Aos.ReplayCli -- \
 ```
 
 Expected result: a latency summary with min, median, p95, and max decision time plus the selected model and candidate counts.
+
+## Sandbox Benchmark
+
+Tool execution runs through a pre-warmed `PooledSandboxToolExecutor` backed by `PreWarmedSandboxPool`.
+The benchmark CLI reports warm/cold start counts and acquire + total latency percentiles for both paths:
+
+```bash
+dotnet run --project source/Aos.ReplayCli -- \
+  benchmark-sandbox \
+  --iterations 10000 \
+  --warmup 1000 \
+  --pool-size 4
+```
+
+To measure cold-path overhead (no pre-warmed slots):
+
+```bash
+dotnet run --project source/Aos.ReplayCli -- \
+  benchmark-sandbox \
+  --iterations 10000 \
+  --warmup 1000 \
+  --pool-size 0
+```
+
+Expected result: warm/cold start counts and latency percentiles. The v1 in-process executor has
+sub-microsecond overhead; the meaningful warm/cold gap will appear in July when slots represent
+real OS-level sandbox processes.

@@ -6,6 +6,7 @@ namespace Aos.ReplayCli;
 
 internal sealed class HelloReplayWorkflow : IReplayWorkflow
 {
+    // Fixed key so replay is deterministic: rotating the live key must not affect golden artifacts.
     private const string ReplayCapabilityKey = "replay-capability-key-at-least-32-bytes";
 
     public string WorkflowName => "hello";

@@ -29,6 +29,8 @@ builder.Services.Configure<RouterMetricsOptions>(
     builder.Configuration.GetSection(RouterMetricsOptions.SectionName));
 builder.Services.Configure<CapabilityTokenOptions>(
     builder.Configuration.GetSection(CapabilityTokenOptions.SectionName));
+builder.Services.Configure<SandboxPoolOptions>(
+    builder.Configuration.GetSection(SandboxPoolOptions.SectionName));
 builder.Services.AddSingleton<IEventLogWriter, FileEventLogWriter>();
 builder.Services.AddSingleton<IManifestWriter, FileManifestWriter>();
 builder.Services.AddSingleton<IEventLogIntegrityChain>(serviceProvider =>
@@ -53,14 +55,27 @@ builder.Services.AddSingleton<ICapabilityTokenIssuer>(serviceProvider =>
     serviceProvider.GetRequiredService<HmacJwtCapabilityTokenService>());
 builder.Services.AddSingleton<ICapabilityTokenValidator>(serviceProvider =>
     serviceProvider.GetRequiredService<HmacJwtCapabilityTokenService>());
-builder.Services.AddSingleton<DeterministicEchoToolExecutor>();
+builder.Services.AddSingleton<PreWarmedSandboxPool>(serviceProvider =>
+{
+    var opts = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<SandboxPoolOptions>>()
+        .Value;
+    return new PreWarmedSandboxPool(opts.PoolSize);
+});
+builder.Services.AddSingleton<PooledSandboxToolExecutor>();
 builder.Services.AddSingleton<IToolExecutor>(serviceProvider =>
     new CapabilityEnforcingToolExecutor(
         serviceProvider.GetRequiredService<ICapabilityTokenValidator>(),
-        serviceProvider.GetRequiredService<DeterministicEchoToolExecutor>()));
+        serviceProvider.GetRequiredService<PooledSandboxToolExecutor>()));
 builder.Services.AddSingleton<IHelloWorkflowService, HelloWorkflowService>();
-builder.Services.AddSingleton<IRouterService, DeterministicRouterService>();
-builder.Services.AddSingleton<IRouterMetricsStore, InMemoryRouterMetricsStore>();
+builder.Services.AddSingleton<IRouterMetricsStore>(serviceProvider =>
+    new InMemoryRouterMetricsStore(
+        serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RouterMetricsOptions>>()));
+builder.Services.AddSingleton<IRouterService>(serviceProvider =>
+    new DeterministicRouterService(
+        serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RouterOptions>>(),
+        serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RouterMetricsOptions>>(),
+        serviceProvider.GetRequiredService<IRouterMetricsStore>()));
 
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracerProviderBuilder =>
