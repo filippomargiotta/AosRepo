@@ -82,13 +82,14 @@ Expected result: a latency summary with min, median, p95, and max decision time 
 ## Sandbox Benchmark
 
 Tool execution runs through a pre-warmed `PooledSandboxToolExecutor` backed by `PreWarmedSandboxPool`.
+The current slot backend is `process-v1`, which starts a single-use `Aos.SandboxWorker` subprocess per slot.
 The benchmark CLI reports warm/cold start counts and acquire + total latency percentiles for both paths:
 
 ```bash
 dotnet run --project source/Aos.ReplayCli -- \
   benchmark-sandbox \
-  --iterations 10000 \
-  --warmup 1000 \
+  --iterations 200 \
+  --warmup 20 \
   --pool-size 4
 ```
 
@@ -97,11 +98,11 @@ To measure cold-path overhead (no pre-warmed slots):
 ```bash
 dotnet run --project source/Aos.ReplayCli -- \
   benchmark-sandbox \
-  --iterations 10000 \
-  --warmup 1000 \
+  --iterations 50 \
+  --warmup 5 \
   --pool-size 0
 ```
 
-Expected result: warm/cold start counts and latency percentiles. The v1 in-process executor has
-sub-microsecond overhead; the meaningful warm/cold gap will appear in July when slots represent
-real OS-level sandbox processes.
+Expected result: warm/cold start counts and latency percentiles. With `process-v1`, warm acquire
+measures queue dequeue for an already-started worker, while cold acquire includes worker process startup.
+Use bounded iteration counts because every one-shot process slot is eventually replaced by a real worker process.

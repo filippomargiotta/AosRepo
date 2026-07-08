@@ -5,5 +5,5 @@ public sealed class SandboxPoolOptions
     public const string SectionName = "SandboxPool";
 
     public int PoolSize { get; set; } = 4;
-    public string ExecutorType { get; set; } = "in-process-v1";
+    public string ExecutorType { get; set; } = "process-v1";
 }

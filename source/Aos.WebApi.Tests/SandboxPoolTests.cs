@@ -9,14 +9,87 @@ namespace Aos.WebApi.Tests;
 
 public sealed class SandboxPoolTests
 {
+    // --- ProcessSandboxSlot ---
+
+    [Fact]
+    public void ProcessSlot_Execute_RunsToolInSubprocess()
+    {
+        using var slot = new ProcessSandboxSlot();
+
+        var result = slot.Execute(CreateRequest(inputJson: "{\"message\":\"from-process\"}"));
+
+        Assert.Equal("succeeded", result.Status);
+        Assert.Equal("{\"message\":\"from-process\"}", result.OutputJson);
+    }
+
+    [Fact]
+    public void ProcessSlot_AfterDispose_RejectsFurtherExecution()
+    {
+        var slot = new ProcessSandboxSlot();
+        slot.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => slot.Execute(CreateRequest()));
+    }
+
+    [Fact]
+    public void ProcessSlot_WhenWorkerCrashes_ReturnsStableErrorResult()
+    {
+        using var slot = new ProcessSandboxSlot(environmentVariables: EnableWorkerTestCommands());
+
+        var result = slot.Execute(CreateRequest(inputJson: "{\"sandboxTest\":\"crash\"}"));
+
+        Assert.Equal("failed", result.Status);
+        Assert.Equal("{}", result.OutputJson);
+        Assert.Equal("sandbox_process_exit", result.Error);
+    }
+
+    [Fact]
+    public void ProcessSlot_WhenWorkerTimesOut_ReturnsStableErrorResult()
+    {
+        using var slot = new ProcessSandboxSlot(
+            executionTimeout: TimeSpan.FromMilliseconds(100),
+            environmentVariables: EnableWorkerTestCommands());
+
+        var result = slot.Execute(CreateRequest(inputJson: "{\"sandboxTest\":\"timeout\"}"));
+
+        Assert.Equal("failed", result.Status);
+        Assert.Equal("{}", result.OutputJson);
+        Assert.Equal("sandbox_timeout", result.Error);
+    }
+
+    [Fact]
+    public void ProcessSlot_TestCommandsAreIgnoredByDefault()
+    {
+        using var slot = new ProcessSandboxSlot();
+
+        var result = slot.Execute(CreateRequest(inputJson: "{\"sandboxTest\":\"crash\"}"));
+
+        Assert.Equal("succeeded", result.Status);
+        Assert.Equal("{\"sandboxTest\":\"crash\"}", result.OutputJson);
+    }
+
+    [Fact]
+    public void ProcessSlot_DrainsWorkerStderr()
+    {
+        using var slot = new ProcessSandboxSlot(
+            executionTimeout: TimeSpan.FromSeconds(5),
+            environmentVariables: EnableWorkerTestCommands());
+
+        var result = slot.Execute(CreateRequest(inputJson: "{\"sandboxTest\":\"stderr\"}"));
+
+        Assert.Equal("succeeded", result.Status);
+        Assert.Equal("{\"sandboxTest\":\"stderr\"}", result.OutputJson);
+    }
+
     // --- PreWarmedSandboxPool ---
 
     [Fact]
     public void Pool_WhenPreWarmed_ReturnsWarmStartOnFirstAcquire()
     {
-        var pool = new PreWarmedSandboxPool(poolSize: 1);
+        using var pool = new PreWarmedSandboxPool(poolSize: 1);
 
-        var (_, wasWarm) = pool.Acquire();
+        var (slot, wasWarm) = pool.Acquire();
+        pool.Release(slot);
 
         Assert.True(wasWarm);
     }
@@ -24,7 +97,7 @@ public sealed class SandboxPoolTests
     [Fact]
     public void Pool_WhenEmpty_ReturnsColdStartAndCreatesSlot()
     {
-        var pool = new PreWarmedSandboxPool(poolSize: 0);
+        using var pool = new PreWarmedSandboxPool(poolSize: 0);
 
         var (slot, wasWarm) = pool.Acquire();
 
@@ -36,25 +109,26 @@ public sealed class SandboxPoolTests
     [Fact]
     public void Pool_AfterRelease_RefilsToConfiguredSize()
     {
-        var pool = new PreWarmedSandboxPool(poolSize: 2);
+        using var pool = new PreWarmedSandboxPool(poolSize: 2);
         var (slot, _) = pool.Acquire();
         Assert.Equal(1, pool.CurrentPoolSize);
 
         pool.Release(slot);
 
-        Assert.Equal(2, pool.CurrentPoolSize);
+        Assert.True(WaitUntil(() => pool.CurrentPoolSize == 2), "Pool did not refill to configured size.");
     }
 
     [Fact]
     public void Pool_DoesNotExceedMaxPoolSize_OnRelease()
     {
-        var pool = new PreWarmedSandboxPool(poolSize: 1);
-        var (coldSlot, _) = pool.Acquire();
-        var (_, _) = pool.Acquire();
+        using var pool = new PreWarmedSandboxPool(poolSize: 1);
+        var (firstSlot, _) = pool.Acquire();
+        var (secondSlot, _) = pool.Acquire();
 
-        pool.Release(coldSlot);
+        pool.Release(firstSlot);
+        secondSlot.Dispose();
 
-        Assert.Equal(1, pool.CurrentPoolSize);
+        Assert.True(pool.CurrentPoolSize <= 1);
     }
 
     [Fact]
@@ -62,7 +136,7 @@ public sealed class SandboxPoolTests
     {
         const int poolSize = 3;
         const int threads = 20;
-        var pool = new PreWarmedSandboxPool(poolSize);
+        using var pool = new PreWarmedSandboxPool(poolSize);
         var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
 
         Parallel.For(0, threads, _ =>
@@ -86,10 +160,10 @@ public sealed class SandboxPoolTests
     {
         const int poolSize = 3;
         const int threads = 10;
-        var pool = new PreWarmedSandboxPool(poolSize);
+        using var pool = new PreWarmedSandboxPool(poolSize);
         var barrier = new Barrier(threads);
         var warmCount = 0;
-        var slots = new InProcessSandboxSlot[threads];
+        var slots = new ProcessSandboxSlot[threads];
 
         Parallel.For(0, threads, i =>
         {
@@ -110,12 +184,77 @@ public sealed class SandboxPoolTests
         Assert.True(warmCount <= poolSize, $"Warm starts ({warmCount}) exceeded pool size ({poolSize}).");
     }
 
+    [Fact]
+    public void Pool_ReleaseRefillsWithFreshProcessSlot()
+    {
+        using var pool = new PreWarmedSandboxPool(poolSize: 1);
+        var (firstSlot, _) = pool.Acquire();
+        var firstProcessId = firstSlot.ProcessId;
+
+        pool.Release(firstSlot);
+        Assert.True(WaitUntil(() => pool.CurrentPoolSize == 1), "Pool did not refill after release.");
+        var (secondSlot, _) = pool.Acquire();
+        var secondProcessId = secondSlot.ProcessId;
+        pool.Release(secondSlot);
+
+        Assert.NotEqual(firstProcessId, secondProcessId);
+    }
+
+    [Fact]
+    public void Pool_ReleaseSchedulesReplacementWithoutBlockingCaller()
+    {
+        var factoryCalls = 0;
+        using var pool = new PreWarmedSandboxPool(
+            poolSize: 1,
+            slotFactory: () =>
+            {
+                if (Interlocked.Increment(ref factoryCalls) > 1)
+                {
+                    Thread.Sleep(300);
+                }
+
+                return new ProcessSandboxSlot();
+            });
+        var (slot, _) = pool.Acquire();
+
+        var startedAt = DateTimeOffset.UtcNow;
+        pool.Release(slot);
+        var elapsed = DateTimeOffset.UtcNow - startedAt;
+
+        Assert.True(elapsed < TimeSpan.FromMilliseconds(150), $"Release blocked for {elapsed.TotalMilliseconds:0.0} ms.");
+        Assert.True(WaitUntil(() => pool.CurrentPoolSize == 1), "Background refill did not complete.");
+    }
+
+    [Fact]
+    public void Pool_DisposeDuringPendingRefill_DoesNotKeepReplacementQueued()
+    {
+        var factoryCalls = 0;
+        var pool = new PreWarmedSandboxPool(
+            poolSize: 1,
+            slotFactory: () =>
+            {
+                if (Interlocked.Increment(ref factoryCalls) > 1)
+                {
+                    Thread.Sleep(300);
+                }
+
+                return new ProcessSandboxSlot();
+            });
+        var (slot, _) = pool.Acquire();
+
+        pool.Release(slot);
+        pool.Dispose();
+
+        Thread.Sleep(700);
+        Assert.Equal(0, pool.CurrentPoolSize);
+    }
+
     // --- PooledSandboxToolExecutor ---
 
     [Fact]
     public void PooledExecutor_WarmStart_PopulatesSandboxExecutionInfo()
     {
-        var executor = CreateExecutor(poolSize: 1);
+        using var executor = CreateExecutor(poolSize: 1);
 
         var result = executor.Execute(CreateRequest());
 
@@ -126,7 +265,7 @@ public sealed class SandboxPoolTests
     [Fact]
     public void PooledExecutor_ColdStart_PopulatesSandboxExecutionInfo()
     {
-        var executor = CreateExecutor(poolSize: 0);
+        using var executor = CreateExecutor(poolSize: 0);
 
         var result = executor.Execute(CreateRequest());
 
@@ -137,7 +276,7 @@ public sealed class SandboxPoolTests
     [Fact]
     public void PooledExecutor_AlwaysPopulatesNonNegativeLatencies()
     {
-        var executor = CreateExecutor(poolSize: 2);
+        using var executor = CreateExecutor(poolSize: 2);
 
         var result = executor.Execute(CreateRequest());
 
@@ -149,18 +288,18 @@ public sealed class SandboxPoolTests
     [Fact]
     public void PooledExecutor_SetsExecutorType()
     {
-        var executor = CreateExecutor(poolSize: 1, executorType: "in-process-v1");
+        using var executor = CreateExecutor(poolSize: 1, executorType: "process-v1");
 
         var result = executor.Execute(CreateRequest());
 
-        Assert.Equal("in-process-v1", result.SandboxExecution!.ExecutorType);
+        Assert.Equal("process-v1", result.SandboxExecution!.ExecutorType);
     }
 
     [Fact]
     public void PooledExecutor_RefillsPoolAfterEachExecution()
     {
-        var pool = new PreWarmedSandboxPool(poolSize: 1);
-        var executor = new PooledSandboxToolExecutor(pool, Microsoft.Extensions.Options.Options.Create(new SandboxPoolOptions { PoolSize = 1 }));
+        using var pool = new PreWarmedSandboxPool(poolSize: 1);
+        using var executor = new PooledSandboxToolExecutor(pool, Microsoft.Extensions.Options.Options.Create(new SandboxPoolOptions { PoolSize = 1 }));
 
         executor.Execute(CreateRequest());
         executor.Execute(CreateRequest());
@@ -173,7 +312,7 @@ public sealed class SandboxPoolTests
     [Fact]
     public void PooledExecutor_DoesNotPersistSandboxInfoToToolEvent()
     {
-        var executor = CreateExecutor(poolSize: 1);
+        using var executor = CreateExecutor(poolSize: 1);
         var result = executor.Execute(CreateRequest());
 
         var eventJson = JsonSerializer.Serialize(new ToolExecutionEvent(
@@ -195,9 +334,9 @@ public sealed class SandboxPoolTests
     [Fact]
     public void PooledExecutor_WithCapabilityLayer_StillPopulatesSandboxInfo()
     {
-        var pool = new PreWarmedSandboxPool(poolSize: 2);
-        var options = Microsoft.Extensions.Options.Options.Create(new SandboxPoolOptions { PoolSize = 2, ExecutorType = "in-process-v1" });
-        var pooledExecutor = new PooledSandboxToolExecutor(pool, options);
+        using var pool = new PreWarmedSandboxPool(poolSize: 2);
+        var options = Microsoft.Extensions.Options.Options.Create(new SandboxPoolOptions { PoolSize = 2, ExecutorType = "process-v1" });
+        using var pooledExecutor = new PooledSandboxToolExecutor(pool, options);
         var capabilityService = CapabilityTestData.CreateTokenService();
         var enforcingExecutor = new CapabilityEnforcingToolExecutor(capabilityService, pooledExecutor);
 
@@ -225,14 +364,14 @@ public sealed class SandboxPoolTests
     [Fact]
     public void BenchmarkRunner_ReportsWarmAndColdCounts()
     {
-        var pool = new PreWarmedSandboxPool(poolSize: 2);
-        var options = Microsoft.Extensions.Options.Options.Create(new SandboxPoolOptions { PoolSize = 2, ExecutorType = "in-process-v1" });
-        var executor = new PooledSandboxToolExecutor(pool, options);
+        using var pool = new PreWarmedSandboxPool(poolSize: 2);
+        var options = Microsoft.Extensions.Options.Options.Create(new SandboxPoolOptions { PoolSize = 2, ExecutorType = "process-v1" });
+        using var executor = new PooledSandboxToolExecutor(pool, options);
 
         var report = SandboxBenchmarkRunner.Run(
             executor,
             poolSize: 2,
-            executorType: "in-process-v1",
+            executorType: "process-v1",
             new SandboxBenchmarkOptions(Iterations: 20, WarmupIterations: 0));
 
         Assert.Equal(20, report.WarmStartCount + report.ColdStartCount);
@@ -242,34 +381,56 @@ public sealed class SandboxPoolTests
     [Fact]
     public void BenchmarkRunner_AllColdWithZeroPoolSize()
     {
-        var pool = new PreWarmedSandboxPool(poolSize: 0);
-        var options = Microsoft.Extensions.Options.Options.Create(new SandboxPoolOptions { PoolSize = 0, ExecutorType = "in-process-v1" });
-        var executor = new PooledSandboxToolExecutor(pool, options);
+        using var pool = new PreWarmedSandboxPool(poolSize: 0);
+        var options = Microsoft.Extensions.Options.Options.Create(new SandboxPoolOptions { PoolSize = 0, ExecutorType = "process-v1" });
+        using var executor = new PooledSandboxToolExecutor(pool, options);
 
         var report = SandboxBenchmarkRunner.Run(
             executor,
             poolSize: 0,
-            executorType: "in-process-v1",
+            executorType: "process-v1",
             new SandboxBenchmarkOptions(Iterations: 10, WarmupIterations: 0));
 
         Assert.Equal(10, report.ColdStartCount);
         Assert.Equal(0, report.WarmStartCount);
     }
 
-    private static PooledSandboxToolExecutor CreateExecutor(int poolSize, string executorType = "in-process-v1")
+    private static PooledSandboxToolExecutor CreateExecutor(int poolSize, string executorType = "process-v1")
     {
         var pool = new PreWarmedSandboxPool(poolSize);
         var options = Microsoft.Extensions.Options.Options.Create(new SandboxPoolOptions { PoolSize = poolSize, ExecutorType = executorType });
         return new PooledSandboxToolExecutor(pool, options);
     }
 
-    private static ToolExecutionRequest CreateRequest() =>
+    private static ToolExecutionRequest CreateRequest(string inputJson = "{\"test\":true}") =>
         new(
             RunId: "test-run",
             InvocationId: "test-run:tool:0",
             Tool: new ToolRef("echo", "1.0"),
             Action: "tool.execute",
-            InputJson: "{\"test\":true}",
+            InputJson: inputJson,
             CapabilityToken: string.Empty,
             RequestedAtUtc: DateTimeOffset.UtcNow);
+
+    private static IReadOnlyDictionary<string, string> EnableWorkerTestCommands() =>
+        new Dictionary<string, string>
+        {
+            [ProcessSandboxSlot.TestCommandsEnvironmentVariable] = "1"
+        };
+
+    private static bool WaitUntil(Func<bool> predicate, int timeoutMs = 2_000)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (predicate())
+            {
+                return true;
+            }
+
+            Thread.Sleep(10);
+        }
+
+        return predicate();
+    }
 }

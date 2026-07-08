@@ -24,17 +24,17 @@ public static class SandboxBenchmarkCliRunner
             var poolOptions = new SandboxPoolOptions
             {
                 PoolSize = request.PoolSize,
-                ExecutorType = "in-process-v1"
+                ExecutorType = "process-v1"
             };
-            var pool = new PreWarmedSandboxPool(request.PoolSize);
-            var executor = new PooledSandboxToolExecutor(pool, Microsoft.Extensions.Options.Options.Create(poolOptions));
+            using var pool = new PreWarmedSandboxPool(request.PoolSize);
+            using var executor = new PooledSandboxToolExecutor(pool, Microsoft.Extensions.Options.Options.Create(poolOptions));
             var report = SandboxBenchmarkRunner.Run(
                 executor,
                 request.PoolSize,
                 poolOptions.ExecutorType,
                 new SandboxBenchmarkOptions(request.Iterations, request.WarmupIterations));
 
-            await stdout.WriteLineAsync("Sandbox benchmark: in-process-v1");
+            await stdout.WriteLineAsync("Sandbox benchmark: process-v1");
             await stdout.WriteLineAsync($"executor.type: {report.ExecutorType}");
             await stdout.WriteLineAsync($"pool.size: {report.PoolSize}");
             await stdout.WriteLineAsync($"iterations: {report.Iterations}");

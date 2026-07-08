@@ -95,7 +95,7 @@ public class SmokeTests
     {
         var services = new ServiceCollection();
 
-        var poolOptions = new SandboxPoolOptions { PoolSize = 2, ExecutorType = "in-process-v1" };
+        var poolOptions = new SandboxPoolOptions { PoolSize = 2, ExecutorType = "process-v1" };
         services.AddSingleton<IOptions<SandboxPoolOptions>>(
             Microsoft.Extensions.Options.Options.Create(poolOptions));
         services.AddSingleton<PreWarmedSandboxPool>(sp =>

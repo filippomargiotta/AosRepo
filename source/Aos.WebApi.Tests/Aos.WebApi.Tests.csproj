@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Aos.Core\Aos.Core.csproj" />
+    <ProjectReference Include="..\Aos.SandboxWorker\Aos.SandboxWorker.csproj" />
     <ProjectReference Include="..\Aos.WebApi\Aos.WebApi.csproj" />
     <ProjectReference Include="..\Aos.ReplayCli\Aos.ReplayCli.csproj" />
   </ItemGroup>

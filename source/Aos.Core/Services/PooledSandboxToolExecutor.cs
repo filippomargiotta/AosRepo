@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace Aos.WebApi.Services;
 
-public sealed class PooledSandboxToolExecutor : IToolExecutor
+public sealed class PooledSandboxToolExecutor : IToolExecutor, IDisposable
 {
     private readonly PreWarmedSandboxPool _pool;
     private readonly string _executorType;
@@ -49,4 +49,9 @@ public sealed class PooledSandboxToolExecutor : IToolExecutor
 
     private static double ToMilliseconds(long ticks) =>
         ticks * 1000.0 / Stopwatch.Frequency;
+
+    public void Dispose()
+    {
+        _pool.Dispose();
+    }
 }

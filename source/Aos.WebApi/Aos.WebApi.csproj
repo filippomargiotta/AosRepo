@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Aos.Core\Aos.Core.csproj" />
+    <ProjectReference Include="..\Aos.SandboxWorker\Aos.SandboxWorker.csproj" />
   </ItemGroup>
 
 </Project>
