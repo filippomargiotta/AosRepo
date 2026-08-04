@@ -29,6 +29,8 @@
 - The event log tail `chainMac` must match `manifest.eventLog.lastChainMac`.
 - Replay uses the recorded routing decision instead of re-evaluating live router configuration, so historical artifacts stay reproducible after policy/candidate changes.
 - Event-log schema `0.2` can carry domain event payloads such as `tool.execution`; adding June tool I/O and its capability-policy decision did not change the signed event-log envelope.
+- Replay validates the requested tool identity and input against the recorded `tool.execution` event, then consumes the recorded status, output, and deterministic error. External tool execution is not repeated during replay.
+- Sandbox runtime metadata such as container id, warm/cold state, and latency remains outside signed artifacts; the deterministic sandbox outcome is captured by the signed tool status/output/error fields.
 - Capability JWTs are never persisted in replay artifacts. The `tool.execution` payload records only the deterministic policy id, allow/deny decision, stable reason code, and non-secret token id.
 - Workflow selection is still CLI-driven and is not yet encoded into the manifest schema.
 

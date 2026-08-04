@@ -8,6 +8,7 @@ namespace Aos.WebApi.Tests;
 public sealed class GoldenTests
 {
     private const string GoldenRunId = "run-golden-hello-1";
+    private const string GoldenTimeoutRunId = "run-golden-hello-timeout-1";
     private const string GoldenHmacKey = GoldenArtifactTestSupport.GoldenHmacKey;
     private const string GoldenHmacKeyId = GoldenArtifactTestSupport.GoldenHmacKeyId;
     private static readonly DateTimeOffset GoldenInstant = new(2026, 2, 26, 19, 0, 0, TimeSpan.Zero);
@@ -81,6 +82,47 @@ public sealed class GoldenTests
             GoldenArtifactTestSupport.SerializeEventLogLines(replayed.EventLogRecords));
     }
 
+    [Fact]
+    public void RecordHelloWorkflow_WithSandboxTimeout_MatchesCheckedInGoldenArtifacts()
+    {
+        var capabilityTokenService = CapabilityTestData.CreateTokenService();
+        var recordTimeSource = new RecordingTimeSource(new FixedSequenceTimeSource(
+            [GoldenInstant, GoldenInstant, GoldenInstant],
+            new TimeSourceInfo(
+                Mode: "record",
+                Source: "golden-fixed",
+                ClockId: "clock-golden-timeout-1",
+                Precision: "utc-millis",
+                Notes: "golden sandbox timeout fixture")));
+        var seed = GoldenSeed with
+        {
+            SeedId = $"seed-{GoldenTimeoutRunId}",
+            Value = 424243
+        };
+        var executor = new CapabilityEnforcingToolExecutor(
+            capabilityTokenService,
+            new FixedFailureToolExecutor("sandbox_timeout"));
+        var service = new HelloWorkflowService(
+            new FixedSeedProvider(seed, preserveSeedId: true),
+            recordTimeSource,
+            Microsoft.Extensions.Options.Options.Create(CreateGoldenHelloWorkflowOptions()),
+            new FixedRouterService(CreateGoldenRoutingDecision()),
+            capabilityTokenService,
+            executor,
+            CreateIntegrityChain(),
+            CreateManifestSigner());
+
+        var artifacts = service.CreateHelloArtifacts(GoldenTimeoutRunId);
+        UpdateTimeoutGoldenArtifactsWhenRequested(artifacts);
+
+        Assert.Equal(
+            GoldenArtifactTestSupport.ReadGoldenManifestJson(GoldenArtifactTestSupport.HelloTimeoutScenario),
+            GoldenArtifactTestSupport.SerializeManifestRecord(artifacts.ManifestRecord));
+        Assert.Equal(
+            GoldenArtifactTestSupport.ReadGoldenEventLogJsonl(GoldenArtifactTestSupport.HelloTimeoutScenario),
+            GoldenArtifactTestSupport.SerializeEventLogLines(artifacts.EventLogRecords));
+    }
+
     private static IEventLogIntegrityChain CreateIntegrityChain() =>
         new HmacEventLogIntegrityChain(GoldenHmacKey, GoldenHmacKeyId);
 
@@ -143,5 +185,47 @@ public sealed class GoldenTests
             requiredComplianceTags: [ "standard" ],
             effectiveWeights: new RouterSelectionWeights(0.25m, 0.25m, 0.25m, 0.25m),
             score: 0.85m);
+    }
+
+    private static void UpdateTimeoutGoldenArtifactsWhenRequested(HelloWorkflowArtifacts artifacts)
+    {
+        if (!string.Equals(
+                Environment.GetEnvironmentVariable("AOS_UPDATE_GOLDEN"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var directory = GoldenArtifactTestSupport.GetGoldenDir(GoldenArtifactTestSupport.HelloTimeoutScenario);
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "scenario.json"),
+            "{\"name\":\"hello-workflow-timeout-v1\",\"workflow\":\"hello\",\"manifestPath\":\"manifest.json\",\"eventLogPath\":\"eventlog.jsonl\"}\n");
+        File.WriteAllText(
+            Path.Combine(directory, "manifest.json"),
+            GoldenArtifactTestSupport.SerializeManifestRecord(artifacts.ManifestRecord));
+        File.WriteAllText(
+            Path.Combine(directory, "eventlog.jsonl"),
+            GoldenArtifactTestSupport.SerializeEventLogLines(artifacts.EventLogRecords));
+    }
+
+    private sealed class FixedFailureToolExecutor : IToolExecutor
+    {
+        private readonly string _error;
+
+        public FixedFailureToolExecutor(string error)
+        {
+            _error = error;
+        }
+
+        public ToolExecutionResult Execute(ToolExecutionRequest request) =>
+            new(
+                InvocationId: request.InvocationId,
+                Tool: request.Tool,
+                Status: "failed",
+                InputJson: request.InputJson,
+                OutputJson: "{}",
+                Error: _error);
     }
 }

@@ -1,6 +1,7 @@
 using Aos.WebApi.Models;
 using Aos.WebApi.Options;
 using Aos.WebApi.Services;
+using System.Text.Json;
 
 namespace Aos.ReplayCli;
 
@@ -21,6 +22,7 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
             [ manifest.StartedAtUtc, .. expectedRecords.Select(record => record.Entry.OccurredAtUtc) ],
             manifest.TimeSource);
         var capabilityTokenService = CreateCapabilityTokenService();
+        var recordedToolExecution = ReadRecordedToolExecution(manifest.RunId, expectedRecords);
         var service = new HelloWorkflowService(
             new FixedSeedProvider(manifest.Seed),
             replayTimeSource,
@@ -29,7 +31,7 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
             capabilityTokenService,
             new CapabilityEnforcingToolExecutor(
                 capabilityTokenService,
-                new DeterministicEchoToolExecutor()),
+                new RecordedToolExecutor(recordedToolExecution)),
             eventLogIntegrityChain,
             manifestSigner);
 
@@ -90,6 +92,29 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
             LifetimeSeconds = 300
         }));
 
+    private static ToolExecutionEvent ReadRecordedToolExecution(
+        string runId,
+        IReadOnlyList<EventLogRecord> expectedRecords)
+    {
+        var record = expectedRecords.SingleOrDefault(item =>
+            string.Equals(item.Entry.EventType, "tool.execution", StringComparison.Ordinal));
+        if (record is null)
+        {
+            throw new InvalidOperationException("Replay requires exactly one recorded tool.execution event.");
+        }
+
+        if (!string.Equals(record.Entry.RunId, runId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Recorded tool execution run id does not match the manifest run id.");
+        }
+
+        var data = JsonSerializer.SerializeToElement(
+            record.Entry.Data,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        return data.Deserialize<ToolExecutionEvent>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new InvalidOperationException("Recorded tool.execution payload is invalid.");
+    }
+
     private sealed class FixedSeedProvider : ISeedProvider
     {
         private readonly SeedInfo _seed;
@@ -120,6 +145,36 @@ internal sealed class HelloReplayWorkflow : IReplayWorkflow
             }
 
             return _routingDecision;
+        }
+    }
+
+    private sealed class RecordedToolExecutor : IToolExecutor
+    {
+        private readonly ToolExecutionEvent _recorded;
+
+        public RecordedToolExecutor(ToolExecutionEvent recorded)
+        {
+            _recorded = recorded;
+        }
+
+        public ToolExecutionResult Execute(ToolExecutionRequest request)
+        {
+            if (!string.Equals(request.InvocationId, _recorded.InvocationId, StringComparison.Ordinal)
+                || !string.Equals(request.Tool.ToolId, _recorded.ToolId, StringComparison.Ordinal)
+                || !string.Equals(request.Tool.Version, _recorded.ToolVersion, StringComparison.Ordinal)
+                || !string.Equals(request.InputJson, _recorded.InputJson, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Replay tool request does not match the recorded tool.execution event.");
+            }
+
+            return new ToolExecutionResult(
+                InvocationId: _recorded.InvocationId,
+                Tool: request.Tool,
+                Status: _recorded.Status,
+                InputJson: _recorded.InputJson,
+                OutputJson: _recorded.OutputJson,
+                Error: _recorded.Error);
         }
     }
 }

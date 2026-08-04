@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Aos.WebApi.Models;
 using Aos.WebApi.Options;
 using Aos.WebApi.Services;
@@ -79,6 +80,114 @@ public sealed class SandboxPoolTests
 
         Assert.Equal("succeeded", result.Status);
         Assert.Equal("{\"sandboxTest\":\"stderr\"}", result.OutputJson);
+    }
+
+    // --- ContainerSandboxSlot (requires AOS_CONTAINER_TESTS=1 and a built local image) ---
+
+    [ContainerFact]
+    [Trait("Category", "Container")]
+    public void ContainerSlot_Execute_RunsToolInHardenedContainer()
+    {
+        using var slot = new ContainerSandboxSlot(CreateContainerOptions());
+
+        var result = slot.Execute(CreateRequest(inputJson: "{\"message\":\"from-container\"}"));
+
+        Assert.Equal("succeeded", result.Status);
+        Assert.Equal("{\"message\":\"from-container\"}", result.OutputJson);
+    }
+
+    [ContainerFact]
+    [Trait("Category", "Container")]
+    public void ContainerSlot_AppliesConfiguredIsolationAndResourceLimits()
+    {
+        var options = CreateContainerOptions();
+        using var slot = new ContainerSandboxSlot(options);
+
+        using var document = JsonDocument.Parse(InspectContainer(slot.ContainerName));
+        var hostConfig = document.RootElement.GetProperty("HostConfig");
+        var config = document.RootElement.GetProperty("Config");
+
+        Assert.Equal("none", hostConfig.GetProperty("NetworkMode").GetString());
+        Assert.True(hostConfig.GetProperty("ReadonlyRootfs").GetBoolean());
+        Assert.Contains("ALL", hostConfig.GetProperty("CapDrop").EnumerateArray().Select(item => item.GetString()));
+        Assert.Contains("no-new-privileges:true", hostConfig.GetProperty("SecurityOpt").EnumerateArray().Select(item => item.GetString()));
+        Assert.Equal(options.MemoryLimitMb * 1024L * 1024L, hostConfig.GetProperty("Memory").GetInt64());
+        Assert.Equal(options.MemoryLimitMb * 1024L * 1024L, hostConfig.GetProperty("MemorySwap").GetInt64());
+        Assert.Equal((long)(options.CpuLimit * 1_000_000_000m), hostConfig.GetProperty("NanoCpus").GetInt64());
+        Assert.Equal(options.PidsLimit, hostConfig.GetProperty("PidsLimit").GetInt32());
+        Assert.True(hostConfig.GetProperty("Tmpfs").TryGetProperty("/tmp", out _));
+        Assert.Equal("1654", config.GetProperty("User").GetString());
+        Assert.Empty(document.RootElement.GetProperty("Mounts").EnumerateArray());
+    }
+
+    [ContainerTheory]
+    [InlineData("filesystem-write", "allowed", false)]
+    [InlineData("network", "allowed", false)]
+    [InlineData("environment", "visible", false)]
+    [Trait("Category", "Container")]
+    public void ContainerSlot_SecurityProbe_IsDenied(string command, string property, bool expected)
+    {
+        Environment.SetEnvironmentVariable("AOS_HOST_SECRET_SHOULD_NOT_LEAK", "host-secret");
+        try
+        {
+            var result = RunContainerProbe(command);
+            using var output = JsonDocument.Parse(result.OutputJson);
+
+            Assert.Equal("succeeded", result.Status);
+            Assert.Equal(expected, output.RootElement.GetProperty(property).GetBoolean());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AOS_HOST_SECRET_SHOULD_NOT_LEAK", null);
+        }
+    }
+
+    [ContainerFact]
+    [Trait("Category", "Container")]
+    public void ContainerSlot_OneShotContainers_DoNotShareTenantState()
+    {
+        using var tenantA = new ContainerSandboxSlot(CreateContainerOptions(), enableTestCommands: true);
+        using var tenantB = new ContainerSandboxSlot(CreateContainerOptions(), enableTestCommands: true);
+        var writeResult = tenantA.Execute(CreateRequest("{\"sandboxTest\":\"state-write\"}") with
+        {
+            RunId = "tenant-a",
+            InvocationId = "tenant-a:tool:0"
+        });
+        var readResult = tenantB.Execute(CreateRequest("{\"sandboxTest\":\"state-read\"}") with
+        {
+            RunId = "tenant-b",
+            InvocationId = "tenant-b:tool:0"
+        });
+        using var output = JsonDocument.Parse(readResult.OutputJson);
+
+        Assert.Equal("succeeded", writeResult.Status);
+        Assert.False(output.RootElement.GetProperty("visible").GetBoolean());
+    }
+
+    [ContainerFact]
+    [Trait("Category", "Container")]
+    public void ContainerSlot_WhenWorkerExceedsMemory_ReturnsStableResourceError()
+    {
+        var result = RunContainerProbe("memory");
+
+        Assert.Equal("failed", result.Status);
+        Assert.Equal("sandbox_resource_limit", result.Error);
+    }
+
+    [ContainerFact]
+    [Trait("Category", "Container")]
+    public void ContainerSlot_WhenWorkerTimesOut_RemovesContainerAndReturnsStableError()
+    {
+        using var slot = new ContainerSandboxSlot(
+            CreateContainerOptions(),
+            enableTestCommands: true,
+            executionTimeout: TimeSpan.FromMilliseconds(100));
+
+        var result = slot.Execute(CreateRequest(inputJson: "{\"sandboxTest\":\"timeout\"}"));
+
+        Assert.Equal("failed", result.Status);
+        Assert.Equal("sandbox_timeout", result.Error);
+        Assert.False(ContainerExists(slot.ContainerName));
     }
 
     // --- PreWarmedSandboxPool ---
@@ -163,7 +272,7 @@ public sealed class SandboxPoolTests
         using var pool = new PreWarmedSandboxPool(poolSize);
         var barrier = new Barrier(threads);
         var warmCount = 0;
-        var slots = new ProcessSandboxSlot[threads];
+        var slots = new ISandboxSlot[threads];
 
         Parallel.For(0, threads, i =>
         {
@@ -189,15 +298,15 @@ public sealed class SandboxPoolTests
     {
         using var pool = new PreWarmedSandboxPool(poolSize: 1);
         var (firstSlot, _) = pool.Acquire();
-        var firstProcessId = firstSlot.ProcessId;
+        var firstSlotId = firstSlot.SlotId;
 
         pool.Release(firstSlot);
         Assert.True(WaitUntil(() => pool.CurrentPoolSize == 1), "Pool did not refill after release.");
         var (secondSlot, _) = pool.Acquire();
-        var secondProcessId = secondSlot.ProcessId;
+        var secondSlotId = secondSlot.SlotId;
         pool.Release(secondSlot);
 
-        Assert.NotEqual(firstProcessId, secondProcessId);
+        Assert.NotEqual(firstSlotId, secondSlotId);
     }
 
     [Fact]
@@ -418,6 +527,58 @@ public sealed class SandboxPoolTests
             [ProcessSandboxSlot.TestCommandsEnvironmentVariable] = "1"
         };
 
+    private static SandboxPoolOptions CreateContainerOptions() => new()
+    {
+        PoolSize = 1,
+        ExecutorType = "container-v1",
+        ContainerImage = "aos-sandbox-worker:local",
+        MemoryLimitMb = 192,
+        CpuLimit = 0.5m,
+        PidsLimit = 32,
+        TmpfsSizeMb = 16
+    };
+
+    private static ToolExecutionResult RunContainerProbe(string command, string runId = "test-run")
+    {
+        using var slot = new ContainerSandboxSlot(CreateContainerOptions(), enableTestCommands: true);
+        return slot.Execute(CreateRequest(
+            inputJson: $"{{\"sandboxTest\":\"{command}\"}}") with { InvocationId = $"{runId}:tool:0", RunId = runId });
+    }
+
+    private static string InspectContainer(string containerName)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "docker",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("inspect");
+        startInfo.ArgumentList.Add(containerName);
+        using var process = Process.Start(startInfo)!;
+        var output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        Assert.Equal(0, process.ExitCode);
+        return output.TrimStart('[').TrimEnd(']', '\n', '\r');
+    }
+
+    private static bool ContainerExists(string containerName)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "docker",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("inspect");
+        startInfo.ArgumentList.Add(containerName);
+        using var process = Process.Start(startInfo)!;
+        process.WaitForExit();
+        return process.ExitCode == 0;
+    }
+
     private static bool WaitUntil(Func<bool> predicate, int timeoutMs = 2_000)
     {
         var deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMs);
@@ -433,4 +594,32 @@ public sealed class SandboxPoolTests
 
         return predicate();
     }
+}
+
+internal sealed class ContainerFactAttribute : FactAttribute
+{
+    public ContainerFactAttribute()
+    {
+        if (!ContainerTestsEnabled())
+        {
+            Skip = "Set AOS_CONTAINER_TESTS=1 and build aos-sandbox-worker:local to run container integration tests.";
+        }
+    }
+
+    private static bool ContainerTestsEnabled() =>
+        string.Equals(Environment.GetEnvironmentVariable("AOS_CONTAINER_TESTS"), "1", StringComparison.Ordinal);
+}
+
+internal sealed class ContainerTheoryAttribute : TheoryAttribute
+{
+    public ContainerTheoryAttribute()
+    {
+        if (!ContainerTestsEnabled())
+        {
+            Skip = "Set AOS_CONTAINER_TESTS=1 and build aos-sandbox-worker:local to run container integration tests.";
+        }
+    }
+
+    private static bool ContainerTestsEnabled() =>
+        string.Equals(Environment.GetEnvironmentVariable("AOS_CONTAINER_TESTS"), "1", StringComparison.Ordinal);
 }

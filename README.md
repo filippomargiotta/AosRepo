@@ -82,15 +82,35 @@ Expected result: a latency summary with min, median, p95, and max decision time 
 ## Sandbox Benchmark
 
 Tool execution runs through a pre-warmed `PooledSandboxToolExecutor` backed by `PreWarmedSandboxPool`.
-The current slot backend is `process-v1`, which starts a single-use `Aos.SandboxWorker` subprocess per slot.
+The Web API defaults to the hardened `container-v1` backend, which starts a single-use
+`Aos.SandboxWorker` container per slot. The container runs as a non-root user with no network,
+a read-only root filesystem, a bounded tmpfs, dropped Linux capabilities, `no-new-privileges`,
+and CPU, memory, and PID limits. `process-v1` remains available for fast local protocol tests.
+
+Build the pinned worker image with OrbStack or another Docker-compatible Linux runtime:
+
+```bash
+docker build \
+  -f source/Aos.SandboxWorker/Dockerfile \
+  -t aos-sandbox-worker:local \
+  source
+```
+
+Run the container security suite:
+
+```bash
+AOS_CONTAINER_TESTS=1 dotnet test source/Aos.sln --no-restore -v minimal
+```
+
 The benchmark CLI reports warm/cold start counts and acquire + total latency percentiles for both paths:
 
 ```bash
 dotnet run --project source/Aos.ReplayCli -- \
   benchmark-sandbox \
-  --iterations 200 \
-  --warmup 20 \
-  --pool-size 4
+  --iterations 20 \
+  --warmup 0 \
+  --pool-size 4 \
+  --executor container-v1
 ```
 
 To measure cold-path overhead (no pre-warmed slots):
@@ -98,11 +118,12 @@ To measure cold-path overhead (no pre-warmed slots):
 ```bash
 dotnet run --project source/Aos.ReplayCli -- \
   benchmark-sandbox \
-  --iterations 50 \
-  --warmup 5 \
-  --pool-size 0
+  --iterations 10 \
+  --warmup 0 \
+  --pool-size 0 \
+  --executor container-v1
 ```
 
-Expected result: warm/cold start counts and latency percentiles. With `process-v1`, warm acquire
-measures queue dequeue for an already-started worker, while cold acquire includes worker process startup.
-Use bounded iteration counts because every one-shot process slot is eventually replaced by a real worker process.
+Expected result: warm/cold start counts and latency percentiles. Warm acquire measures queue dequeue
+for an already-ready isolated worker; cold acquire includes container and .NET worker startup.
+Use bounded iteration counts because each one-shot slot is replaced with a fresh container.

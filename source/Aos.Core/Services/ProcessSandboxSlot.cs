@@ -4,7 +4,7 @@ using Aos.WebApi.Models;
 
 namespace Aos.WebApi.Services;
 
-public sealed class ProcessSandboxSlot : IDisposable
+public sealed class ProcessSandboxSlot : ISandboxSlot
 {
     public const string ReadyLine = "__aos_sandbox_worker_ready_v1";
     public const string TestCommandsEnvironmentVariable = "AOS_SANDBOX_WORKER_TEST_COMMANDS";
@@ -35,6 +35,8 @@ public sealed class ProcessSandboxSlot : IDisposable
     }
 
     public int ProcessId => _process.Id;
+
+    public string SlotId => $"process:{_process.Id}";
 
     public bool HasExited => _process.HasExited;
 
@@ -77,7 +79,9 @@ public sealed class ProcessSandboxSlot : IDisposable
         try
         {
             var result = JsonSerializer.Deserialize<ToolExecutionResult>(responseLine, JsonOptions);
-            return result ?? CreateFailure(request, "sandbox_protocol_error");
+            return IsValidResponse(request, result)
+                ? result!
+                : CreateFailure(request, "sandbox_protocol_error");
         }
         catch (JsonException)
         {
@@ -173,4 +177,11 @@ public sealed class ProcessSandboxSlot : IDisposable
             InputJson: request.InputJson,
             OutputJson: "{}",
             Error: error);
+
+    private static bool IsValidResponse(ToolExecutionRequest request, ToolExecutionResult? result) =>
+        result is not null
+        && string.Equals(result.InvocationId, request.InvocationId, StringComparison.Ordinal)
+        && string.Equals(result.Tool.ToolId, request.Tool.ToolId, StringComparison.Ordinal)
+        && string.Equals(result.Tool.Version, request.Tool.Version, StringComparison.Ordinal)
+        && string.Equals(result.InputJson, request.InputJson, StringComparison.Ordinal);
 }

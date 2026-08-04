@@ -3,9 +3,9 @@ namespace Aos.WebApi.Services;
 public sealed class PreWarmedSandboxPool : IDisposable
 {
     private readonly object _gate = new();
-    private readonly Queue<ProcessSandboxSlot> _slots = new();
+    private readonly Queue<ISandboxSlot> _slots = new();
     private readonly int _maxPoolSize;
-    private readonly Func<ProcessSandboxSlot> _slotFactory;
+    private readonly Func<ISandboxSlot> _slotFactory;
     private int _refillsInFlight;
     private bool _disposed;
 
@@ -14,7 +14,7 @@ public sealed class PreWarmedSandboxPool : IDisposable
     {
     }
 
-    public PreWarmedSandboxPool(int poolSize, Func<ProcessSandboxSlot> slotFactory)
+    public PreWarmedSandboxPool(int poolSize, Func<ISandboxSlot> slotFactory)
     {
         if (poolSize < 0)
         {
@@ -40,7 +40,7 @@ public sealed class PreWarmedSandboxPool : IDisposable
         }
     }
 
-    public (ProcessSandboxSlot Slot, bool WasWarm) Acquire()
+    public (ISandboxSlot Slot, bool WasWarm) Acquire()
     {
         lock (_gate)
         {
@@ -66,7 +66,7 @@ public sealed class PreWarmedSandboxPool : IDisposable
     }
 
     // One-shot slot semantics: release discards the used slot and schedules a fresh warm replacement.
-    public void Release(ProcessSandboxSlot slot)
+    public void Release(ISandboxSlot slot)
     {
         ArgumentNullException.ThrowIfNull(slot);
         slot.Dispose();
@@ -75,7 +75,7 @@ public sealed class PreWarmedSandboxPool : IDisposable
 
     public void Dispose()
     {
-        List<ProcessSandboxSlot> slotsToDispose;
+        List<ISandboxSlot> slotsToDispose;
         lock (_gate)
         {
             if (_disposed)
@@ -111,7 +111,7 @@ public sealed class PreWarmedSandboxPool : IDisposable
 
     private void RefillAsync()
     {
-        ProcessSandboxSlot? slot = null;
+        ISandboxSlot? slot = null;
         try
         {
             slot = _slotFactory();

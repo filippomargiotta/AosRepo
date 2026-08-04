@@ -21,7 +21,8 @@ public sealed class GoldenEvaluationRunnerTests
 
         Assert.Equal(0, exitCode);
         Assert.Contains("PASS hello-workflow-v1", stdout.ToString());
-        Assert.Contains("Evaluated 1 scenario(s): 1 passed, 0 failed.", stdout.ToString());
+        Assert.Contains("PASS hello-workflow-timeout-v1", stdout.ToString());
+        Assert.Contains("Evaluated 2 scenario(s): 2 passed, 0 failed.", stdout.ToString());
         Assert.Equal(string.Empty, stderr.ToString());
     }
 

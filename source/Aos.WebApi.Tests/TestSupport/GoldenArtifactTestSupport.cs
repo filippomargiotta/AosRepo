@@ -9,6 +9,7 @@ namespace Aos.WebApi.Tests;
 internal static class GoldenArtifactTestSupport
 {
     public const string HelloScenario = "hello-workflow-v1";
+    public const string HelloTimeoutScenario = "hello-workflow-timeout-v1";
     public const string GoldenHmacKey = "golden-hmac-key";
     public const string GoldenHmacKeyId = "golden-key-1";
 

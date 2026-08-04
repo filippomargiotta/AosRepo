@@ -60,7 +60,7 @@ builder.Services.AddSingleton<PreWarmedSandboxPool>(serviceProvider =>
     var opts = serviceProvider
         .GetRequiredService<Microsoft.Extensions.Options.IOptions<SandboxPoolOptions>>()
         .Value;
-    return new PreWarmedSandboxPool(opts.PoolSize);
+    return new PreWarmedSandboxPool(opts.PoolSize, SandboxSlotFactory.Create(opts));
 });
 builder.Services.AddSingleton<PooledSandboxToolExecutor>();
 builder.Services.AddSingleton<IToolExecutor>(serviceProvider =>
@@ -87,6 +87,9 @@ builder.Services.AddOpenTelemetry()
     });
 
 var app = builder.Build();
+
+// Materialize the pool before accepting traffic so the first workflow request uses warm slots.
+_ = app.Services.GetRequiredService<PreWarmedSandboxPool>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

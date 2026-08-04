@@ -24,9 +24,12 @@ public static class SandboxBenchmarkCliRunner
             var poolOptions = new SandboxPoolOptions
             {
                 PoolSize = request.PoolSize,
-                ExecutorType = "process-v1"
+                ExecutorType = request.ExecutorType,
+                ContainerImage = request.ContainerImage
             };
-            using var pool = new PreWarmedSandboxPool(request.PoolSize);
+            using var pool = new PreWarmedSandboxPool(
+                request.PoolSize,
+                SandboxSlotFactory.Create(poolOptions));
             using var executor = new PooledSandboxToolExecutor(pool, Microsoft.Extensions.Options.Options.Create(poolOptions));
             var report = SandboxBenchmarkRunner.Run(
                 executor,
@@ -34,7 +37,7 @@ public static class SandboxBenchmarkCliRunner
                 poolOptions.ExecutorType,
                 new SandboxBenchmarkOptions(request.Iterations, request.WarmupIterations));
 
-            await stdout.WriteLineAsync("Sandbox benchmark: process-v1");
+            await stdout.WriteLineAsync($"Sandbox benchmark: {poolOptions.ExecutorType}");
             await stdout.WriteLineAsync($"executor.type: {report.ExecutorType}");
             await stdout.WriteLineAsync($"pool.size: {report.PoolSize}");
             await stdout.WriteLineAsync($"iterations: {report.Iterations}");
@@ -80,6 +83,8 @@ public static class SandboxBenchmarkCliRunner
         int? iterations = null;
         var warmupIterations = 1_000;
         var poolSize = 4;
+        var executorType = "process-v1";
+        var containerImage = "aos-sandbox-worker:local";
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -110,6 +115,12 @@ public static class SandboxBenchmarkCliRunner
                     }
 
                     break;
+                case "--executor" when i + 1 < args.Length:
+                    executorType = args[++i];
+                    break;
+                case "--container-image" when i + 1 < args.Length:
+                    containerImage = args[++i];
+                    break;
                 default:
                     error = $"Unknown or incomplete argument: {args[i]}";
                     return false;
@@ -122,7 +133,18 @@ public static class SandboxBenchmarkCliRunner
             return false;
         }
 
-        request = new SandboxBenchmarkCliRequest(iterations.Value, warmupIterations, poolSize);
+        if (executorType is not ("process-v1" or "container-v1"))
+        {
+            error = "The --executor value must be process-v1 or container-v1.";
+            return false;
+        }
+
+        request = new SandboxBenchmarkCliRequest(
+            iterations.Value,
+            warmupIterations,
+            poolSize,
+            executorType,
+            containerImage);
         return true;
     }
 
@@ -130,15 +152,17 @@ public static class SandboxBenchmarkCliRunner
         latencyMs.ToString("0.0000", CultureInfo.InvariantCulture);
 
     private static string GetUsageText() => """
-        Usage: aos-replay benchmark-sandbox --iterations <count> [--warmup <count>] [--pool-size <count>]
+        Usage: aos-replay benchmark-sandbox --iterations <count> [--warmup <count>] [--pool-size <count>] [--executor process-v1|container-v1] [--container-image <name>]
 
-        Defaults: --warmup 1000 --pool-size 4
+        Defaults: --warmup 1000 --pool-size 4 --executor process-v1 --container-image aos-sandbox-worker:local
         Exit codes: 0=reported, 1=benchmark failure, 2=usage/input failure
         """;
 
     private readonly record struct SandboxBenchmarkCliRequest(
         int Iterations,
         int WarmupIterations,
-        int PoolSize
+        int PoolSize,
+        string ExecutorType,
+        string ContainerImage
     );
 }
