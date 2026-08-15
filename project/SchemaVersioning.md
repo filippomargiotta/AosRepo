@@ -3,6 +3,8 @@
 ## Current baseline
 - Manifest schema version is locked to `0.3`.
 - Event log schema baseline is `0.2`.
+- Planner plan schema baseline is `0.1`.
+- Planner playbook schema baseline is `0.1`.
 - Replay currently supports exact-version artifacts only; it does not attempt cross-version migration.
 
 ## Compatibility rules
@@ -33,6 +35,15 @@
 - Sandbox runtime metadata such as container id, warm/cold state, and latency remains outside signed artifacts; the deterministic sandbox outcome is captured by the signed tool status/output/error fields.
 - Capability JWTs are never persisted in replay artifacts. The `tool.execution` payload records only the deterministic policy id, allow/deny decision, stable reason code, and non-secret token id.
 - Workflow selection is still CLI-driven and is not yet encoded into the manifest schema.
+
+## Planner artifact boundary
+
+- Planner plans and playbooks use separate `0.1` schema-versioned contracts and are not part of manifest `0.3`.
+- Plan action ids are matched using ordinal, case-sensitive comparison against an allowed-action catalogue bound to concrete tool ids and versions.
+- Plan validation is fail-closed: unsupported schemas, invalid step order, duplicate step ids, unknown actions/arguments, and missing required arguments are rejected with stable error codes.
+- Playbook retrieval first filters by exact task class, then ranks normalized retrieval-term overlap descending, followed by playbook id/version in ordinal lexical order.
+- Planner artifacts are not persisted or signed in August 1/2. Signing must land together with the planner envelope, validation-before-persistence rules, replay linkage, and compatibility tests.
+- Any later decision to embed or reference planner artifacts in the manifest must explicitly decide whether manifest `0.3` can represent the reference or requires a version bump. The change must not be implicit.
 
 ## Change policy
 - Any manifest or event-log schema change must bump the relevant schema version explicitly.
