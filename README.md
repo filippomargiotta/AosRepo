@@ -2,7 +2,7 @@
 
 ## Replay CLI
 
-The replay CLI validates signed manifest integrity, validates event-log integrity, checks artifact compatibility, and replays the `hello` workflow artifacts. The current `hello` golden scenario includes a deterministic tool execution event, so replay also compares captured tool input/output.
+The replay CLI validates signed manifest integrity, validates event-log integrity, checks artifact compatibility, and replays the `hello` and `planner` workflow artifacts. Planner replay consumes the recorded validated plan and tool outcomes rather than rerunning retrieval, model generation, or tools.
 
 Run from repo root:
 
@@ -15,6 +15,8 @@ dotnet run --project source/Aos.ReplayCli -- \
 ```
 
 Expected result: exit code `0` and a replay verification success message when artifacts match.
+
+Replay a planner scenario with `--workflow planner` and one of the `planner-*` golden artifact directories.
 
 Tool execution is protected by a short-lived invocation-specific JWT capability. The token is validated immediately before `IToolExecutor` delegates work, while signed artifacts record only the allow/deny decision and non-secret token id; raw JWTs are not persisted.
 
@@ -64,6 +66,23 @@ curl -X POST http://localhost:5057/router/decide \
 Expected result: a ranked deterministic routing decision with the selected model and any rejected candidates.
 
 Current schema/versioning rules for replay artifacts are documented in `project/SchemaVersioning.md`.
+
+## Planner API
+
+The planner endpoint performs exact task-class retrieval, deterministic term-overlap ranking, constrained plan validation, and sequential capability-protected tool execution. Playbooks and allowed actions are configured under `PlannerWorkflow`.
+
+```bash
+curl -X POST http://localhost:5057/workflow/planner \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "taskId": "task-demo-1",
+    "taskClass": "workflow.plan",
+    "terms": ["echo", "single"],
+    "arguments": {"message": "hello planner"}
+  }'
+```
+
+Successful runs emit a signed `planner.plan` event, one `tool.execution` event per completed step, and a final `workflow.planner` event.
 
 ## Router Benchmark
 

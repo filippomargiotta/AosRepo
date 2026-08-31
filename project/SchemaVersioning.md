@@ -42,8 +42,11 @@
 - Plan action ids are matched using ordinal, case-sensitive comparison against an allowed-action catalogue bound to concrete tool ids and versions.
 - Plan validation is fail-closed: unsupported schemas, invalid step order, duplicate step ids, unknown actions/arguments, and missing required arguments are rejected with stable error codes.
 - Playbook retrieval first filters by exact task class, then ranks normalized retrieval-term overlap descending, followed by playbook id/version in ordinal lexical order.
-- Planner artifacts are not persisted or signed in August 1/2. Signing must land together with the planner envelope, validation-before-persistence rules, replay linkage, and compatibility tests.
-- Any later decision to embed or reference planner artifacts in the manifest must explicitly decide whether manifest `0.3` can represent the reference or requires a version bump. The change must not be implicit.
+- Validated plans are persisted as typed `planner.plan` domain events inside event-log schema `0.2`. The event records the normalized task, candidate source, playbook selection, allowed-action catalogue, plan `0.1`, and validation result.
+- Plan validation happens before execution, signing, or persistence. Unsupported or invalid candidates never become replay artifacts.
+- Manifest `0.3` does not embed or directly reference a plan. Its signed event-log summary binds the planner event through record count and tail chain MAC, so the August planner envelope does not require a manifest bump.
+- Replay validates the recorded plan against its signed action catalogue and consumes recorded step outcomes instead of rerunning retrieval, model generation, or tools.
+- Any later decision to add a direct planner field/reference to the manifest must explicitly decide whether manifest `0.3` can represent it or requires a version bump.
 
 ## Change policy
 - Any manifest or event-log schema change must bump the relevant schema version explicitly.

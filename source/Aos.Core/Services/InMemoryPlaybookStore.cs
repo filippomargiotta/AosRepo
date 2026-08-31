@@ -105,6 +105,13 @@ public sealed class InMemoryPlaybookStore : IPlaybookStore
                     $"Playbook '{playbook.PlaybookId}' step at index {index} requires argument templates.");
             }
 
+            if (step.ArgumentTemplates.Any(pair =>
+                    string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
+            {
+                throw new InvalidOperationException(
+                    $"Playbook '{playbook.PlaybookId}' step at index {index} contains an invalid argument template.");
+            }
+
             return step with
             {
                 ArgumentTemplates = new ReadOnlyDictionary<string, string>(

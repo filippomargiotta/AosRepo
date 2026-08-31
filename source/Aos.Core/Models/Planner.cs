@@ -74,3 +74,79 @@ public sealed record PlaybookMatch(
     int Score,
     IReadOnlyList<string> MatchedTerms
 );
+
+public sealed record PlannerTaskRequest(
+    string TaskId,
+    string TaskClass,
+    IReadOnlyList<string> Terms,
+    IReadOnlyDictionary<string, string> Arguments
+);
+
+public sealed record PlannerCandidateResult(
+    string Source,
+    PlannerPlan? Plan,
+    string? ErrorCode,
+    string? Error
+);
+
+public sealed record PlannerPlanningResult(
+    string Status,
+    PlannerTaskRequest Task,
+    PlaybookMatch? SelectedPlaybook,
+    string CandidateSource,
+    PlannerPlan? Plan,
+    PlannerValidationResult Validation,
+    string? ErrorCode,
+    string? Error
+);
+
+public sealed record PlannerStepExecutionResult(
+    int Sequence,
+    string StepId,
+    string ActionId,
+    DateTimeOffset RequestedAtUtc,
+    ToolExecutionResult ToolResult
+);
+
+public sealed record PlannerExecutionResult(
+    string Status,
+    PlannerPlan Plan,
+    IReadOnlyList<PlannerStepExecutionResult> Steps,
+    string? ErrorCode
+);
+
+public sealed record PlannerPlaybookSelection(
+    string PlaybookId,
+    string Version,
+    int Score,
+    IReadOnlyList<string> MatchedTerms
+);
+
+public sealed record PlannerPlanEvent(
+    string ManifestVersion,
+    PlannerTaskRequest Task,
+    string CandidateSource,
+    PlannerPlaybookSelection SelectedPlaybook,
+    IReadOnlyList<AllowedActionDefinition> AllowedActions,
+    PlannerPlan Plan,
+    PlannerValidationResult Validation
+);
+
+public sealed record PlannerWorkflowEvent(
+    string ManifestVersion,
+    string TaskId,
+    string PlanId,
+    string Status,
+    int CompletedStepCount,
+    string? ErrorCode
+);
+
+public sealed record PlannerWorkflowArtifacts(
+    ManifestRecord ManifestRecord,
+    IReadOnlyList<EventLogRecord> EventLogRecords,
+    PlannerPlanningResult Planning,
+    PlannerExecutionResult Execution
+)
+{
+    public Manifest Manifest => ManifestRecord.Manifest;
+}

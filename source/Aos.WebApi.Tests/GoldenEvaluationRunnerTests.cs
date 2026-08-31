@@ -22,7 +22,12 @@ public sealed class GoldenEvaluationRunnerTests
         Assert.Equal(0, exitCode);
         Assert.Contains("PASS hello-workflow-v1", stdout.ToString());
         Assert.Contains("PASS hello-workflow-timeout-v1", stdout.ToString());
-        Assert.Contains("Evaluated 2 scenario(s): 2 passed, 0 failed.", stdout.ToString());
+        Assert.Contains("PASS planner-exact-one-step-v1", stdout.ToString());
+        Assert.Contains("PASS planner-two-step-v1", stdout.ToString());
+        Assert.Contains("PASS planner-highest-score-v1", stdout.ToString());
+        Assert.Contains("PASS planner-lexical-tie-v1", stdout.ToString());
+        Assert.Contains("PASS planner-optional-arguments-v1", stdout.ToString());
+        Assert.Contains("Evaluated 7 scenario(s): 7 passed, 0 failed.", stdout.ToString());
         Assert.Equal(string.Empty, stderr.ToString());
     }
 

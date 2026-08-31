@@ -23,6 +23,8 @@ builder.Services.Configure<EventLogOptions>(
     builder.Configuration.GetSection(EventLogOptions.SectionName));
 builder.Services.Configure<HelloWorkflowOptions>(
     builder.Configuration.GetSection(HelloWorkflowOptions.SectionName));
+builder.Services.Configure<PlannerWorkflowOptions>(
+    builder.Configuration.GetSection(PlannerWorkflowOptions.SectionName));
 builder.Services.Configure<RouterOptions>(
     builder.Configuration.GetSection(RouterOptions.SectionName));
 builder.Services.Configure<RouterMetricsOptions>(
@@ -68,6 +70,27 @@ builder.Services.AddSingleton<IToolExecutor>(serviceProvider =>
         serviceProvider.GetRequiredService<ICapabilityTokenValidator>(),
         serviceProvider.GetRequiredService<PooledSandboxToolExecutor>()));
 builder.Services.AddSingleton<IHelloWorkflowService, HelloWorkflowService>();
+builder.Services.AddSingleton<AllowedActionCatalog>(serviceProvider =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<PlannerWorkflowOptions>>()
+        .Value;
+    return new AllowedActionCatalog(PlannerConfiguration.CreateAllowedActions(options));
+});
+builder.Services.AddSingleton<IPlaybookStore>(serviceProvider =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<PlannerWorkflowOptions>>()
+        .Value;
+    return new InMemoryPlaybookStore(PlannerConfiguration.CreatePlaybooks(options));
+});
+builder.Services.AddSingleton<DeterministicPlaybookRetriever>();
+builder.Services.AddSingleton<IPlannerCandidateProvider, DeterministicPlaybookCandidateProvider>();
+builder.Services.AddSingleton<PlannerPlanValidator>(serviceProvider =>
+    new PlannerPlanValidator(serviceProvider.GetRequiredService<AllowedActionCatalog>()));
+builder.Services.AddSingleton<IPlannerService, DeterministicPlannerService>();
+builder.Services.AddSingleton<PlannerStepExecutor>();
+builder.Services.AddSingleton<IPlannerWorkflowService, PlannerWorkflowService>();
 builder.Services.AddSingleton<IRouterMetricsStore>(serviceProvider =>
     new InMemoryRouterMetricsStore(
         serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RouterMetricsOptions>>()));

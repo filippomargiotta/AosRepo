@@ -1,4 +1,5 @@
 using Aos.WebApi.Options;
+using Aos.WebApi.Models;
 using Aos.WebApi.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -113,5 +114,44 @@ public class SmokeTests
         Assert.IsType<PreWarmedSandboxPool>(pool);
         Assert.IsType<PooledSandboxToolExecutor>(executor);
         Assert.Equal(2, pool.CurrentPoolSize);
+    }
+
+    [Fact]
+    public void Di_PlannerService_UsesConfiguredActionCatalogWithoutConstructorAmbiguity()
+    {
+        var services = new ServiceCollection();
+        var action = new AllowedActionDefinition(
+            "echo.message",
+            new ToolRef("echo", "1.0"),
+            [new AllowedActionArgumentDefinition("message", true)]);
+        var playbook = new PlannerPlaybook(
+            PlannerSchemaVersions.CurrentPlaybookVersion,
+            "echo",
+            "1",
+            "workflow.plan",
+            "Echo playbook",
+            ["echo"],
+            [new PlannerPlaybookStep(
+                "echo.message",
+                new Dictionary<string, string> { ["message"] = "{{message}}" })]);
+
+        services.AddSingleton(new AllowedActionCatalog([action]));
+        services.AddSingleton<IPlaybookStore>(new InMemoryPlaybookStore([playbook]));
+        services.AddSingleton<DeterministicPlaybookRetriever>();
+        services.AddSingleton<IPlannerCandidateProvider, DeterministicPlaybookCandidateProvider>();
+        services.AddSingleton<PlannerPlanValidator>(serviceProvider =>
+            new PlannerPlanValidator(serviceProvider.GetRequiredService<AllowedActionCatalog>()));
+        services.AddSingleton<IPlannerService, DeterministicPlannerService>();
+
+        using var provider = services.BuildServiceProvider();
+        var planner = provider.GetRequiredService<IPlannerService>();
+        var result = planner.Plan(new PlannerTaskRequest(
+            "task-1",
+            "workflow.plan",
+            ["echo"],
+            new Dictionary<string, string> { ["message"] = "hello" }));
+
+        Assert.Equal("validated", result.Status);
+        Assert.Equal("echo.message", result.Plan!.Steps.Single().ActionId);
     }
 }

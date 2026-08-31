@@ -11,6 +11,7 @@
 
 ## OpenAPI compatibility note
 - `Microsoft.AspNetCore.OpenApi` is intentionally pinned to the compatible `10.x` line while the app targets `net10.0`.
+- Keep `Swashbuckle.AspNetCore` on a stable release whose `Microsoft.OpenApi` dependency floor is patched for known advisories; `10.2.3` raises that floor to `2.7.5`.
 - `11.x` preview packages expose the .NET 11 API/asset surface and caused the `net10.0` build to fail with missing OpenAPI transformer types.
 
 ## Future .NET 11 migration

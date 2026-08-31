@@ -4,28 +4,16 @@ namespace Aos.WebApi.Services;
 
 public sealed class PlannerPlanValidator
 {
-    private readonly IReadOnlyDictionary<string, AllowedActionDefinition> _actionsById;
+    private readonly AllowedActionCatalog _catalog;
 
     public PlannerPlanValidator(IEnumerable<AllowedActionDefinition> allowedActions)
+        : this(new AllowedActionCatalog(allowedActions))
     {
-        ArgumentNullException.ThrowIfNull(allowedActions);
+    }
 
-        var actions = allowedActions.Select(ValidateAndSnapshotActionDefinition).ToArray();
-
-        var duplicateActionIds = actions
-            .GroupBy(action => action.ActionId, StringComparer.Ordinal)
-            .Where(group => group.Count() > 1)
-            .Select(group => group.Key)
-            .OrderBy(actionId => actionId, StringComparer.Ordinal)
-            .ToArray();
-
-        if (duplicateActionIds.Length > 0)
-        {
-            throw new InvalidOperationException(
-                $"Allowed actions contain duplicate action ids: {string.Join(", ", duplicateActionIds)}.");
-        }
-
-        _actionsById = actions.ToDictionary(action => action.ActionId, StringComparer.Ordinal);
+    public PlannerPlanValidator(AllowedActionCatalog catalog)
+    {
+        _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
     }
 
     public PlannerValidationResult Validate(PlannerPlan? plan)
@@ -103,7 +91,7 @@ public sealed class PlannerPlanValidator
                 continue;
             }
 
-            if (!_actionsById.TryGetValue(step.ActionId, out var action))
+            if (!_catalog.TryGet(step.ActionId, out var action))
             {
                 AddError(
                     errors,
@@ -165,57 +153,6 @@ public sealed class PlannerPlanValidator
                 $"{path}.arguments.{argument}",
                 $"Required argument '{argument}' is missing for action '{action.ActionId}'.");
         }
-    }
-
-    private static AllowedActionDefinition ValidateAndSnapshotActionDefinition(AllowedActionDefinition action)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-
-        if (string.IsNullOrWhiteSpace(action.ActionId))
-        {
-            throw new InvalidOperationException("AllowedActions[].ActionId is required.");
-        }
-
-        if (action.Tool is null || string.IsNullOrWhiteSpace(action.Tool.ToolId))
-        {
-            throw new InvalidOperationException($"Allowed action '{action.ActionId}' requires a tool id.");
-        }
-
-        if (string.IsNullOrWhiteSpace(action.Tool.Version))
-        {
-            throw new InvalidOperationException($"Allowed action '{action.ActionId}' requires a tool version.");
-        }
-
-        if (action.Arguments is null)
-        {
-            throw new InvalidOperationException($"Allowed action '{action.ActionId}' requires an argument definition list.");
-        }
-
-        var invalidArgumentIndex = action.Arguments
-            .Select((argument, index) => new { argument, index })
-            .FirstOrDefault(item => item.argument is null || string.IsNullOrWhiteSpace(item.argument.Name));
-        if (invalidArgumentIndex is not null)
-        {
-            throw new InvalidOperationException(
-                $"Allowed action '{action.ActionId}' argument at index {invalidArgumentIndex.index} requires a name.");
-        }
-
-        var duplicateArguments = action.Arguments
-            .GroupBy(argument => argument.Name, StringComparer.Ordinal)
-            .Where(group => group.Count() > 1)
-            .Select(group => group.Key)
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-        if (duplicateArguments.Length > 0)
-        {
-            throw new InvalidOperationException(
-                $"Allowed action '{action.ActionId}' contains duplicate arguments: {string.Join(", ", duplicateArguments)}.");
-        }
-
-        return action with
-        {
-            Arguments = Array.AsReadOnly(action.Arguments.ToArray())
-        };
     }
 
     private static void AddError(
