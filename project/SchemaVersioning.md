@@ -48,6 +48,28 @@
 - Replay validates the recorded plan against its signed action catalogue and consumes recorded step outcomes instead of rerunning retrieval, model generation, or tools.
 - Any later decision to add a direct planner field/reference to the manifest must explicitly decide whether manifest `0.3` can represent it or requires a version bump.
 
+## September diagnostics domain contracts
+
+- Repository snapshots and the diagnostics workflow use separate domain schema `0.1`.
+- Manifest `0.3`, event-log envelope `0.2`, and August plan/playbook `0.1` stay supported unchanged.
+- New signed domain events are `diagnostics.started`, `diagnostics.plan`, `diagnostics.critic`,
+  `diagnostics.recovery`, and `diagnostics.completed`, interleaved with `tool.execution`.
+- `diagnostics.started` binds the snapshot reference, normalized task, allowed-action catalogue,
+  and recovery configuration. `diagnostics.plan` records attempt identity and either a validated
+  plan/policy or a stable rejection code; unsafe candidate plans are never persisted.
+- The manifest's tools list identifies the authorized diagnostics catalogue, including in
+  zero-execution rejection runs; `tool.execution` records identify what actually executed.
+- New domain payloads are frozen as JSON before signing so nested snapshot timestamps retain
+  their encoding through a disk round trip. Existing signing/envelope rules are unchanged.
+- Invocation identities include attempt and step number. Snapshot id/hash are bound to tool
+  input, accepted output, and diagnostic citations.
+- Diagnostics replay reconstructs orchestration from recorded plans, tool outcomes, critic
+  decisions, recovery decisions, and timestamps. It validates plan structure, citation
+  grounding, configured transition bounds, event order, and terminal equivalence without
+  importing a snapshot, executing a tool, or calling a critic/model.
+- Measurements remain runtime-only in the evaluation report. Reports separate planner,
+  tool, and sandbox lifecycle duration.
+
 ## Change policy
 - Any manifest or event-log schema change must bump the relevant schema version explicitly.
 - New schema versions should land with validator updates, replay compatibility decisions, and tests in the same change.

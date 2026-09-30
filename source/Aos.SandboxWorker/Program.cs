@@ -2,6 +2,25 @@ using System.Text.Json;
 using Aos.WebApi.Models;
 using Aos.WebApi.Services;
 
+if (args.Length == 2 && args[0] == "--repository-profile")
+{
+    if (args[1] == "pricing.broad") { await Task.Delay(TimeSpan.FromSeconds(30)); return 0; }
+    if (args[1] == "pricing.focused") return RepositoryFixture.Pricing.PricingTests.RunFocused();
+    return 2;
+}
+
+RepositoryToolExecutor? repositoryExecutor = null;
+var snapshotRoot = Environment.GetEnvironmentVariable("AOS_REPOSITORY_SNAPSHOT_ROOT");
+if (snapshotRoot is not null)
+{
+    var snapshot = RepositorySnapshot.Import(snapshotRoot, RepositoryDiagnosticsDefaults.Revision, RepositoryDiagnosticsDefaults.CreatedAt);
+    var packaged = RepositorySnapshot.Import(Path.Combine(AppContext.BaseDirectory, "repository-fixture"),
+        RepositoryDiagnosticsDefaults.Revision, RepositoryDiagnosticsDefaults.CreatedAt);
+    repositoryExecutor = new RepositoryToolExecutor(snapshot,
+        RepositoryDiagnosticsDefaults.Profiles(packaged.Reference.ContentHash, typeof(ProcessSandboxSlot).Assembly.Location.Replace("Aos.Core.dll", "Aos.SandboxWorker.dll")),
+        new PackagedRepositoryTestRunner());
+}
+
 Console.Out.WriteLine(ProcessSandboxSlot.ReadyLine);
 Console.Out.Flush();
 
@@ -66,7 +85,9 @@ if (TestCommandsAreEnabled())
     }
 }
 
-var result = new DeterministicEchoToolExecutor().Execute(request);
+var result = request.Tool.ToolId.StartsWith("repo.", StringComparison.Ordinal) || request.Action.StartsWith("repo.", StringComparison.Ordinal)
+    ? repositoryExecutor?.Execute(request) ?? request.ToFailure("repo.snapshot.unavailable")
+    : new DeterministicEchoToolExecutor().Execute(request);
 WriteResult(result);
 return 0;
 
@@ -83,7 +104,8 @@ static ToolExecutionResult RunFilesystemWriteProbe(ToolExecutionRequest request)
     var allowed = true;
     try
     {
-        File.WriteAllText("/app/sandbox-write-probe", "denied");
+        var root = Environment.GetEnvironmentVariable("AOS_REPOSITORY_SNAPSHOT_ROOT") ?? "/app";
+        File.WriteAllText(Path.Combine(root, "sandbox-write-probe"), "denied");
     }
     catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
     {

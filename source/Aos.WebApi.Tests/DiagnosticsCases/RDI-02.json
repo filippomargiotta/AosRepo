@@ -1,0 +1,30 @@
+{
+  "caseId": "RDI-02",
+  "request": {
+    "snapshot": {
+      "schemaVersion": "0.1",
+      "snapshotId": "sha256:6c13d7a97ce3587b55e39073f7394316954ea94a79f8dad5e063e0de8670c9f9",
+      "contentHash": "6c13d7a97ce3587b55e39073f7394316954ea94a79f8dad5e063e0de8670c9f9",
+      "sourceRevision": "repository-diagnostics-fixture-v1",
+      "createdAtUtc": "2026-09-30T00:00:00+00:00"
+    },
+    "task": {
+      "taskId": "RDI-02",
+      "taskClass": "repository.diagnosis",
+      "terms": [
+        "configuration"
+      ],
+      "arguments": {}
+    }
+  },
+  "expectedStatus": "succeeded",
+  "expectedReason": "evidence.grounded",
+  "requiredEvidencePaths": [
+    "appsettings.json",
+    "appsettings.Development.json",
+    "Configuration/Program.cs"
+  ],
+  "requiredTestProfile": null,
+  "recoverable": false,
+  "expectedAttempts": 1
+}

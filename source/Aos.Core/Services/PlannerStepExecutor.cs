@@ -22,7 +22,7 @@ public sealed class PlannerStepExecutor
         _timeSource = timeSource ?? throw new ArgumentNullException(nameof(timeSource));
     }
 
-    public PlannerExecutionResult Execute(string runId, PlannerPlan plan, CancellationToken cancellationToken = default)
+    public PlannerExecutionResult Execute(string runId, PlannerPlan plan, CancellationToken cancellationToken = default, int? attempt = null)
     {
         if (string.IsNullOrWhiteSpace(runId))
         {
@@ -44,7 +44,8 @@ public sealed class PlannerStepExecutor
             }
 
             var requestedAt = _timeSource.NowUtc();
-            var invocationId = $"{runId}:planner-step:{step.Sequence}";
+            var invocationId = attempt is null ? $"{runId}:planner-step:{step.Sequence}" :
+                $"{runId}:attempt:{attempt}:planner-step:{step.Sequence}";
             var scope = new ToolCapabilityScope(
                 runId,
                 invocationId,

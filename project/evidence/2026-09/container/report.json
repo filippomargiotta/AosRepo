@@ -1,0 +1,240 @@
+{
+  "schemaVersion": "0.1",
+  "executor": "container-v1",
+  "snapshot": {
+    "schemaVersion": "0.1",
+    "snapshotId": "sha256:6c13d7a97ce3587b55e39073f7394316954ea94a79f8dad5e063e0de8670c9f9",
+    "contentHash": "6c13d7a97ce3587b55e39073f7394316954ea94a79f8dad5e063e0de8670c9f9",
+    "sourceRevision": "repository-diagnostics-fixture-v1",
+    "createdAtUtc": "2026-09-30T00:00:00+00:00"
+  },
+  "plannerV1": [
+    {
+      "caseId": "RDI-01",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 30.610300000000052,
+      "toolDurationMs": 243.538167,
+      "sandboxOverheadMs": 855.684033,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded"
+    },
+    {
+      "caseId": "RDI-02",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.6494000000000142,
+      "toolDurationMs": 218.09879199999997,
+      "sandboxOverheadMs": 1002.2159079999999,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded"
+    },
+    {
+      "caseId": "RDI-06",
+      "taskSuccess": false,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0.75,
+      "criticRejectionReasons": [
+        "test.timeout"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.8920000000000528,
+      "toolDurationMs": 702.552667,
+      "sandboxOverheadMs": 1057.809933,
+      "outcome": "failed",
+      "reasonCode": "recovery.attempt_limit"
+    },
+    {
+      "caseId": "RDI-07",
+      "taskSuccess": false,
+      "validPlanRate": 0,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "evidence.none"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.2246,
+      "toolDurationMs": 0,
+      "sandboxOverheadMs": 0,
+      "outcome": "failed",
+      "reasonCode": "recovery.attempt_limit"
+    },
+    {
+      "caseId": "RDI-09",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "policy.denied"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": true,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.24389999999999645,
+      "toolDurationMs": 22.031375,
+      "sandboxOverheadMs": 264.163825,
+      "outcome": "denied",
+      "reasonCode": "policy.denied"
+    },
+    {
+      "caseId": "RDI-10",
+      "taskSuccess": true,
+      "validPlanRate": 0,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "plan.invalid"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": true,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.2621,
+      "toolDurationMs": 0,
+      "sandboxOverheadMs": 0,
+      "outcome": "denied",
+      "reasonCode": "plan.invalid"
+    }
+  ],
+  "plannerV2": [
+    {
+      "caseId": "RDI-01",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.6059000000000196,
+      "toolDurationMs": 106.92320799999999,
+      "sandboxOverheadMs": 1029.216492,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded"
+    },
+    {
+      "caseId": "RDI-02",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.7607000000000426,
+      "toolDurationMs": 184.92308400000002,
+      "sandboxOverheadMs": 1061.782816,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded"
+    },
+    {
+      "caseId": "RDI-06",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0.875,
+      "criticRejectionReasons": [
+        "test.timeout"
+      ],
+      "recoveryAttempts": 1,
+      "recoverySucceeded": true,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.8355000000001382,
+      "toolDurationMs": 734.570749,
+      "sandboxOverheadMs": 1996.684451,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded"
+    },
+    {
+      "caseId": "RDI-07",
+      "taskSuccess": true,
+      "validPlanRate": 0.5,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [
+        "evidence.none"
+      ],
+      "recoveryAttempts": 1,
+      "recoverySucceeded": true,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.36959999999999127,
+      "toolDurationMs": 171.77525,
+      "sandboxOverheadMs": 872.94375,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded"
+    },
+    {
+      "caseId": "RDI-09",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "policy.denied"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": true,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.28340000000002874,
+      "toolDurationMs": 35.61725,
+      "sandboxOverheadMs": 243.95394999999996,
+      "outcome": "denied",
+      "reasonCode": "policy.denied"
+    },
+    {
+      "caseId": "RDI-10",
+      "taskSuccess": true,
+      "validPlanRate": 0,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "plan.invalid"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": true,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.1175,
+      "toolDurationMs": 0,
+      "sandboxOverheadMs": 0,
+      "outcome": "denied",
+      "reasonCode": "plan.invalid"
+    }
+  ],
+  "v1Successes": 4,
+  "v2Successes": 6,
+  "recoverableSuccessImprovement": 2,
+  "nonRecoveryRegressed": false,
+  "passed": true
+}

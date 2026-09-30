@@ -44,6 +44,62 @@ dotnet run --project source/Aos.ReplayCli -- \
 
 Expected result: exit code `0` and a per-scenario PASS summary.
 
+## Repository Diagnostics — September Planner v2
+
+The read-only demonstrator diagnoses a frozen miniature .NET repository, cites recorded
+source/test evidence, and recovers once from a broad-test timeout or empty retrieval.
+The API requires `container-v1`. Only `repo.search`, `repo.read`, and named-profile
+`repo.test` actions are permitted. Snapshot bytes are immutable after import; the container
+receives one read-only fixture mount and retains the existing network/resource restrictions.
+
+Build the current worker image using the Sandbox Benchmark instructions below, then compare
+the v1 baseline (recovery disabled) and v2 on identical snapshots, playbooks, and tools:
+
+```bash
+dotnet build source/Aos.sln -c Release
+dotnet run --project source/Aos.ReplayCli -c Release --no-build -- \
+  evaluate-diagnostics \
+  --snapshot-dir source/Aos.RepositoryFixture/Repository \
+  --cases-root source/Aos.WebApi.Tests/DiagnosticsCases \
+  --output-dir /tmp/aos-september-evaluation \
+  --hmac-key golden-hmac-key \
+  --executor container-v1
+```
+
+Expected result: v1 passes 4/6 cases, v2 passes 6/6, both recoverable cases improve,
+no other case regresses, and all twelve generated runs replay. Correct policy denial
+counts as task success for the two prohibited-action cases. `report.json` includes
+per-case grounding, plan/step validity, rejection reasons, recovery, replay, and timing.
+Planner overhead, tool duration, and sandbox startup/cleanup are reported separately.
+
+`--executor process-v1 --worker-assembly source/Aos.SandboxWorker/bin/Release/net10.0/Aos.SandboxWorker.dll`
+is available for trusted-fixture protocol regression runs; container mode supplies the
+isolation evidence. Test profiles execute the packaged pricing assertion without build,
+dependency restore, or snapshot writes. The broad profile deliberately waits past its
+deadline. Profile identity is pinned to the packaged fixture's content hash.
+
+Start the Web API normally, retrieve its snapshot reference with
+`GET /workflow/diagnostics/snapshot`, then send the `request` object from a checked-in
+case file to `POST /workflow/diagnostics`. The response contains the diagnosis or terminal
+denial/failure and evidence references. `RepositoryDiagnostics:MaxRetries` accepts `0` or `1`;
+`RepositoryDiagnostics:SnapshotDirectory` defaults to `../Aos.RepositoryFixture/Repository`
+relative to the API content root. In this slice, named test profiles support the frozen
+fixture only; relocating it preserves its content hash.
+
+Replay a retained run with no repository/tool access:
+
+```bash
+dotnet run --project source/Aos.ReplayCli -c Release --no-build -- \
+  --workflow diagnostics \
+  --artifact-dir project/evidence/2026-09/container/planner-v2/RDI-06 \
+  --hmac-key golden-hmac-key
+```
+
+The checked-in golden set now contains thirteen scenarios, including all six diagnostics
+cases. Closure evidence and scope boundaries are in `project/deliverables/2026-09.md`.
+The optional local-model critic adapter can veto a grounded diagnosis; the September
+acceptance run uses rules only and makes no local-model performance claim.
+
 ## Router API
 
 The API also exposes a deterministic router decision endpoint backed by configured model candidates and weighted routing scores.

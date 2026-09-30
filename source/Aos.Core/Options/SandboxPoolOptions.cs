@@ -11,4 +11,5 @@ public sealed class SandboxPoolOptions
     public decimal CpuLimit { get; set; } = 0.5m;
     public int PidsLimit { get; set; } = 32;
     public int TmpfsSizeMb { get; set; } = 16;
+    public string? RepositorySnapshotDirectory { get; set; }
 }

@@ -3,6 +3,7 @@ using Aos.WebApi.Services;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 using Serilog;
+using Aos.WebApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -91,6 +92,17 @@ builder.Services.AddSingleton<PlannerPlanValidator>(serviceProvider =>
 builder.Services.AddSingleton<IPlannerService, DeterministicPlannerService>();
 builder.Services.AddSingleton<PlannerStepExecutor>();
 builder.Services.AddSingleton<IPlannerWorkflowService, PlannerWorkflowService>();
+builder.Services.AddSingleton<DiagnosticsRuntime>(serviceProvider =>
+{
+    var snapshotRoot = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath,
+        builder.Configuration["RepositoryDiagnostics:SnapshotDirectory"] ?? "../Aos.RepositoryFixture/Repository"));
+    return new DiagnosticsRuntime(snapshotRoot,
+        serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<SandboxPoolOptions>>().Value,
+        builder.Configuration.GetValue("RepositoryDiagnostics:MaxRetries", 1),
+        serviceProvider.GetRequiredService<ICapabilityTokenIssuer>(), serviceProvider.GetRequiredService<ICapabilityTokenValidator>(),
+        serviceProvider.GetRequiredService<ISeedProvider>(), serviceProvider.GetRequiredService<ITimeSource>(),
+        serviceProvider.GetRequiredService<IEventLogIntegrityChain>(), serviceProvider.GetRequiredService<IManifestSigner>());
+});
 builder.Services.AddSingleton<IRouterMetricsStore>(serviceProvider =>
     new InMemoryRouterMetricsStore(
         serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RouterMetricsOptions>>()));

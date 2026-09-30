@@ -8,7 +8,7 @@ namespace Aos.ReplayCli;
 public static class ReplayCliRunner
 {
     private static readonly IReadOnlyDictionary<string, IReplayWorkflow> Workflows =
-        new IReplayWorkflow[] { new HelloReplayWorkflow(), new PlannerReplayWorkflow() }
+        new IReplayWorkflow[] { new HelloReplayWorkflow(), new PlannerReplayWorkflow(), new DiagnosticsReplayWorkflow() }
             .ToDictionary(workflow => workflow.WorkflowName, StringComparer.OrdinalIgnoreCase);
 
     private static readonly JsonSerializerOptions JsonOptions = new()

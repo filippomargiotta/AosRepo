@@ -11,4 +11,8 @@
     <ProjectReference Include="..\Aos.Core\Aos.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../Aos.RepositoryFixture/Aos.RepositoryFixture.csproj" />
+    <Content Include="../Aos.RepositoryFixture/Repository/**/*" Link="repository-fixture/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -304,7 +304,7 @@ public sealed class ReplayCliTests
             CancellationToken.None);
 
         Assert.Equal(2, exitCode);
-        Assert.Contains("Unknown workflow 'unknown'. Available workflows: hello, planner.", stderr.ToString());
+        Assert.Contains("Unknown workflow 'unknown'. Available workflows: diagnostics, hello, planner.", stderr.ToString());
     }
 
     [Fact]

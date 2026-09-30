@@ -132,6 +132,14 @@ public sealed class ContainerSandboxSlot : ISandboxSlot
             AddArguments(startInfo, "--env", $"{TestCommandsEnvironmentVariable}=1");
         }
 
+        if (options.RepositorySnapshotDirectory is not null)
+        {
+            var root = Path.GetFullPath(options.RepositorySnapshotDirectory);
+            if (root.Contains(',') || !Directory.Exists(root)) throw new ArgumentException("Invalid snapshot mount directory.");
+            AddArguments(startInfo, "--mount", $"type=bind,source={root},target=/snapshot,readonly",
+                "--env", "AOS_REPOSITORY_SNAPSHOT_ROOT=/snapshot");
+        }
+
         startInfo.ArgumentList.Add(options.ContainerImage);
         return Process.Start(startInfo)
             ?? throw new InvalidOperationException("Sandbox container process failed to start.");

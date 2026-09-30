@@ -1,0 +1,31 @@
+{
+  "caseId": "RDI-07",
+  "request": {
+    "snapshot": {
+      "schemaVersion": "0.1",
+      "snapshotId": "sha256:6c13d7a97ce3587b55e39073f7394316954ea94a79f8dad5e063e0de8670c9f9",
+      "contentHash": "6c13d7a97ce3587b55e39073f7394316954ea94a79f8dad5e063e0de8670c9f9",
+      "sourceRevision": "repository-diagnostics-fixture-v1",
+      "createdAtUtc": "2026-09-30T00:00:00+00:00"
+    },
+    "task": {
+      "taskId": "RDI-07",
+      "taskClass": "repository.diagnosis",
+      "terms": [
+        "unmatched-query"
+      ],
+      "arguments": {
+        "profileId": "pricing.focused"
+      }
+    }
+  },
+  "expectedStatus": "succeeded",
+  "expectedReason": "evidence.grounded",
+  "requiredEvidencePaths": [
+    "Pricing/PriceCalculator.cs",
+    "Pricing/PricingTests.cs"
+  ],
+  "requiredTestProfile": "pricing.focused",
+  "recoverable": true,
+  "expectedAttempts": 2
+}

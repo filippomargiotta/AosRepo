@@ -1,0 +1,63 @@
+{
+  "date": "2026-09-30",
+  "baselineCommit": "7dab9ed",
+  "implementationState": "uncommitted working-tree implementation",
+  "sourceTreeSha256": "520d5199bbfb3077fc35f2ba2dd26dae9690602af41d0a74114dc53bfc615cf4",
+  "hostArchitecture": "ARM64",
+  "dotnetSdk": "10.0.401",
+  "containerRuntime": "OrbStack OCI/runc",
+  "dockerVersion": "29.4.0",
+  "workerImage": "aos-sandbox-worker:local",
+  "workerImageId": "sha256:44ae9516eff9c82384387a3c1ea9d01ce403320ceb3673ea94892b0347f46cf1",
+  "releaseSuite": {
+    "passed": 155,
+    "failed": 0,
+    "skipped": 8
+  },
+  "containerReleaseSuite": {
+    "passed": 165,
+    "failed": 0,
+    "skipped": 0
+  },
+  "goldenEvaluation": {
+    "passed": 13,
+    "failed": 0
+  },
+  "offlineReplay": {
+    "passed": 12,
+    "failed": 0,
+    "network": "none",
+    "readOnlyRoot": true,
+    "snapshotAvailable": false,
+    "sandboxWorkerAvailable": false,
+    "dockerSocketAvailable": false,
+    "mounts": [
+      "Release replay binaries (read-only)",
+      "retained evidence (read-only)"
+    ],
+    "packageFiles": [
+      "Aos.Core.dll",
+      "Aos.ReplayCli.deps.json",
+      "Aos.ReplayCli.dll",
+      "Aos.ReplayCli.runtimeconfig.json",
+      "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
+      "Microsoft.Extensions.Options.dll",
+      "Microsoft.Extensions.Primitives.dll"
+    ],
+    "preparationScript": "scripts/stage-replay-only.py",
+    "preparationScriptSha256": "1f9f136962bb0064d79b4c2105c31c17d72147793ee6fe192fb65167030c005a",
+    "stagedDependencyManifestSha256": "727170c615a3937388fee2050ec1ba54c621bc58e30d32ea607a27793b0977c4"
+  },
+  "apiSmoke": {
+    "cases": [
+      "RDI-01",
+      "RDI-06",
+      "RDI-09",
+      "RDI-10"
+    ],
+    "expectedOutcomesPassed": true,
+    "signedArtifactReplayPassed": true
+  },
+  "sandboxContainersRemaining": 0,
+  "comparisonReport": "container/report.json"
+}

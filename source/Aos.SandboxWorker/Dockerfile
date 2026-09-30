@@ -1,9 +1,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 AS build
 WORKDIR /src
 COPY Aos.Core/Aos.Core.csproj Aos.Core/
+COPY Aos.RepositoryFixture/Aos.RepositoryFixture.csproj Aos.RepositoryFixture/
 COPY Aos.SandboxWorker/Aos.SandboxWorker.csproj Aos.SandboxWorker/
 RUN dotnet restore Aos.SandboxWorker/Aos.SandboxWorker.csproj
 COPY Aos.Core/ Aos.Core/
+COPY Aos.RepositoryFixture/ Aos.RepositoryFixture/
 COPY Aos.SandboxWorker/ Aos.SandboxWorker/
 RUN dotnet publish Aos.SandboxWorker/Aos.SandboxWorker.csproj -c Release -o /out --no-restore
 

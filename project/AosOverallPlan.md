@@ -2,6 +2,10 @@
 
 This file captures the month-by-month plan to implement **AocWebApi** (Agentic Orchestration Web API) in 2026, with an emphasis on **determinism, auditability, replay**, secure tool execution, planning, and evaluation/drift monitoring.
 
+The September–December usefulness track is specified in `project/RealWorldValidationPlan.md`: one bounded, audited repository-diagnostics demonstrator must reach measurable acceptance gates by December 15.
+
+The WBSO technical challenge and experiment trail is maintained in `project/WbsoTechnicalChallengesEvidence.md`, mapped to the approved TC1–TC5 bottlenecks and repository evidence.
+
 ---
 
 ## 2026-01 — Foundations + determinism contract
@@ -126,12 +130,16 @@ This file captures the month-by-month plan to implement **AocWebApi** (Agentic O
 **Goal:** Handle local model weaknesses (known risk).
 
 ### Deliverables
-- Critic/validator stage (rule-based + model-based, but deterministic)
-- Recovery strategies: backtracking, alternative subplan retrieval, step repair
+- Deterministic rule-based critic with an optional, fail-closed local-model assessment; recorded decisions drive replay
+- September recovery is bounded to one alternate query/playbook or narrower named test profile; ambiguous evidence terminates inconclusively
 - Planning evaluation metrics (success rate, step validity rate)
+- Real-world demonstrator foundation: an audited, read-only repository-diagnostics workflow over a versioned repository snapshot
+- Constrained `repo.search`, `repo.read`, and named-profile `repo.test` tools; no arbitrary shell, write, or network action
+- First 6 repository-diagnostics cases covering diagnosis, evidence gathering, recovery, and policy denial
 
 ### Definition of Done (DoD)
-- Planning success rate improves measurably versus Month 8 baseline, with reproducible evaluation.
+- Planning success rate improves measurably versus Month 8 on the recoverable repository-diagnostics cases, with reproducible evaluation.
+- All successful diagnoses cite recorded file/test evidence, all prohibited actions fail closed, and replay does not reopen the repository or rerun tests.
 
 ---
 
@@ -143,9 +151,12 @@ This file captures the month-by-month plan to implement **AocWebApi** (Agentic O
 - Exact scoring + semantic scoring (deterministic)
 - Confidence calibration logic (store distributions, thresholds)
 - Regression report output (per workflow, per step, per tool call)
+- Expand the repository-diagnostics dataset to at least 12 realistic cases with checked-in expected evidence and acceptance criteria
+- Compare Planner v1, Planner v2 recovery, and optional local-model candidate results on the same pinned snapshots
 
 ### Definition of Done (DoD)
 - Evaluation detects real regressions without flagging harmless formatting changes too often.
+- The demonstrator succeeds on at least 10 of 12 cases, with 100% allowed-action validity, 100% prohibited-action rejection, and 100% replay equivalence on the checked-in dataset.
 
 ---
 
@@ -157,9 +168,12 @@ This file captures the month-by-month plan to implement **AocWebApi** (Agentic O
 - Drift detector using CUSUM-style signals
 - Dashboards/alerts (even basic) + release gates
 - Full-system performance tests: replay speed, router P95, sandbox overhead, throughput
+- Run the repository-diagnostics dataset as the primary end-to-end drift signal and report failures by planning, tool, evidence, recovery, and replay stage
+- Add a frozen AosRepo snapshot demo showing targeted test selection, configuration tracing, and replay-artifact diagnosis
 
 ### Definition of Done (DoD)
 - You can run a weekly drift job and get actionable output (not noise).
+- The same pinned diagnostic cases remain reproducible under repeated and concurrent execution, with tool latency reported separately from planner overhead.
 
 ---
 
@@ -171,6 +185,9 @@ This file captures the month-by-month plan to implement **AocWebApi** (Agentic O
 - Hardening sprint: fix nondeterminism leaks, flaky tests, perf regressions
 - Documentation: architecture, determinism contract, manifest/log spec, router policy spec
 - “Evidence pack”: benchmarks, replay proofs, drift reports, security test results (WBSO-friendly)
+- A scripted repository-diagnostics demonstration with before/after recovery results, signed evidence, replay proof, and explicit limitations
+- Feature freeze by December 1; December 1–15 is reserved for stabilization, documentation, and evidence packaging
 
 ### Definition of Done (DoD)
 - Reproducible builds, reproducible replays, and a narrative of tested technical uncertainties.
+- By December 15, a reviewer can run the demonstrator from documented commands and see a useful diagnosis, a denied unsafe request, a recovered failure, and an identical replay from recorded evidence.
