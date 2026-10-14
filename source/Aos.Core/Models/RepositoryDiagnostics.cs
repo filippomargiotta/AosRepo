@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Aos.WebApi.Models;
 
 public static class DiagnosticsSchema
@@ -28,10 +30,13 @@ public sealed record DiagnosticsRecoverySettings(
 public sealed record DiagnosticsStartedEvent(
     string SchemaVersion, string ManifestVersion, DiagnosticsRequest Request,
     DiagnosticsRecoverySettings Recovery, IReadOnlyList<AllowedActionDefinition> AllowedActions);
+// October additions are omitted when null so September's signed events keep their exact bytes.
 public sealed record DiagnosticsPlanEvent(
     int Attempt, PlannerTaskRequest Task, PlannerPlan? Plan,
     PlannerPlaybookSelection? Selection, DiagnosticPlaybookPolicy? Policy,
-    string CandidateSource, bool IsValid, string? ErrorCode);
+    string CandidateSource, bool IsValid, string? ErrorCode,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<PlannerPlaybookSelection>? TiedCandidates = null);
 public sealed record DiagnosticsCriticInput(
     RepositorySnapshotRef Snapshot, DiagnosticsPlanEvent Planning, IReadOnlyList<PlannerStepExecutionResult> Steps);
 public sealed record DiagnosticsCriticDecision(
@@ -40,8 +45,10 @@ public sealed record DiagnosticsCriticDecision(
 public sealed record DiagnosticsRecoveryDecision(
     int Attempt, string PriorFailure, string Strategy, PlannerTaskRequest? NextTask, string? TerminalReason);
 public sealed record DiagnosticsOutcome(
-    string Status, string ReasonCode, int Attempts, string? Diagnosis, IReadOnlyList<DiagnosticEvidenceRef> Evidence);
+    string Status, string ReasonCode, int Attempts, string? Diagnosis, IReadOnlyList<DiagnosticEvidenceRef> Evidence,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<string>? NarrowingCandidates = null);
 public sealed record DiagnosticsWorkflowArtifacts(
     ManifestRecord ManifestRecord, IReadOnlyList<EventLogRecord> EventLogRecords, DiagnosticsOutcome Outcome,
-    [property: System.Text.Json.Serialization.JsonIgnore] DiagnosticsTiming? Timing = null);
+    [property: JsonIgnore] DiagnosticsTiming? Timing = null);
 public sealed record DiagnosticsTiming(double PlannerOverheadMs, double ToolDurationMs, double SandboxOverheadMs);

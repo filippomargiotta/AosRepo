@@ -97,7 +97,9 @@ public sealed record PlannerPlanningResult(
     PlannerPlan? Plan,
     PlannerValidationResult Validation,
     string? ErrorCode,
-    string? Error
+    string? Error,
+    // Retrieval candidates sharing the selected playbook's top score; null when the selection is unique.
+    IReadOnlyList<PlaybookMatch>? TiedCandidates = null
 );
 
 public sealed record PlannerStepExecutionResult(

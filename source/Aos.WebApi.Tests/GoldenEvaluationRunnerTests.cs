@@ -29,7 +29,7 @@ public sealed class GoldenEvaluationRunnerTests
         Assert.Contains("PASS planner-optional-arguments-v1", stdout.ToString());
         Assert.Contains("PASS diagnostics-rdi-06-v1", stdout.ToString());
         Assert.Contains("PASS diagnostics-rdi-10-v1", stdout.ToString());
-        Assert.Contains("Evaluated 13 scenario(s): 13 passed, 0 failed.", stdout.ToString());
+        Assert.Contains("Evaluated 16 scenario(s): 16 passed, 0 failed.", stdout.ToString());
         Assert.Equal(string.Empty, stderr.ToString());
     }
 

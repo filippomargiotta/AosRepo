@@ -2,12 +2,14 @@ namespace Aos.WebApi.Models;
 
 public sealed record DiagnosticsEvaluationCase(
     string CaseId, DiagnosticsRequest Request, string ExpectedStatus, string ExpectedReason,
-    IReadOnlyList<string> RequiredEvidencePaths, string? RequiredTestProfile, bool Recoverable, int ExpectedAttempts);
+    IReadOnlyList<string> RequiredEvidencePaths, string? RequiredTestProfile, bool Recoverable, int ExpectedAttempts,
+    string? ExpectedDenialCode = null, bool ReplayWithoutSnapshot = false);
 public sealed record DiagnosticsCaseMetrics(
     string CaseId, bool TaskSuccess, double ValidPlanRate, bool EvidenceGroundingPassed,
     double ExecutedStepSuccessRate, IReadOnlyList<string> CriticRejectionReasons,
     int RecoveryAttempts, bool RecoverySucceeded, bool? ProhibitedActionRejected,
-    bool ReplayEquivalent, double PlannerOverheadMs, double ToolDurationMs, double SandboxOverheadMs, string Outcome, string ReasonCode);
+    bool ReplayEquivalent, double PlannerOverheadMs, double ToolDurationMs, double SandboxOverheadMs, string Outcome, string ReasonCode,
+    bool? SnapshotRemovedBeforeReplay = null);
 public sealed record DiagnosticsEvaluationReport(
     string SchemaVersion, string Executor, RepositorySnapshotRef Snapshot,
     IReadOnlyList<DiagnosticsCaseMetrics> PlannerV1, IReadOnlyList<DiagnosticsCaseMetrics> PlannerV2,

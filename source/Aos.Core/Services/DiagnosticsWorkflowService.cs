@@ -36,6 +36,7 @@ public sealed class DiagnosticsWorkflowService(
         var authorizedTools = catalog.Actions.Select(a => a.Tool).Distinct().ToArray();
         var capabilityPolicies = new List<PolicyDecision>();
         DiagnosticsOutcome outcome;
+        DiagnosticsPlanEvent planEvent;
         for (var attempt = 1; ; attempt++)
         {
             var planning = planner.Plan(task);
@@ -43,12 +44,14 @@ public sealed class DiagnosticsWorkflowService(
                 new PlannerPlanValidator(catalog).Validate(planning.Plan).IsValid;
             var selected = planning.SelectedPlaybook;
             var policy = selected is null ? null : policies.SingleOrDefault(p => p.PlaybookId == selected.Playbook.PlaybookId && p.Version == selected.Playbook.Version);
-            var planEvent = new DiagnosticsPlanEvent(attempt, planning.Task, valid ? planning.Plan : null,
-                selected is null ? null : new PlannerPlaybookSelection(selected.Playbook.PlaybookId, selected.Playbook.Version, selected.Score, selected.MatchedTerms),
-                policy, planning.CandidateSource, valid, valid ? null : planning.ErrorCode ?? "planner.plan.invalid");
+            // Equal top-score playbooks are competing causes: record them and execute neither rather than tie-break lexically.
+            var tied = planning.TiedCandidates?.Select(Selection).ToArray();
+            planEvent = new DiagnosticsPlanEvent(attempt, planning.Task, valid ? planning.Plan : null,
+                selected is null ? null : Selection(selected),
+                policy, planning.CandidateSource, valid, valid ? null : planning.ErrorCode ?? "planner.plan.invalid", tied);
             Add("diagnostics.plan", planEvent);
             IReadOnlyList<PlannerStepExecutionResult> steps = [];
-            if (valid)
+            if (valid && tied is null)
             {
                 var executionTimer = System.Diagnostics.Stopwatch.StartNew();
                 var result = executor.Execute(runId, planning.Plan!, cancellationToken, attempt);
@@ -81,7 +84,8 @@ public sealed class DiagnosticsWorkflowService(
                 critic.Decision == "inconclusive" ? "inconclusive" :
                 critic.ReasonCode is "policy.denied" or "plan.invalid" or "snapshot.mismatch" ? "denied" : "failed",
                 next.TerminalReason == "attempt_limit" ? "recovery.attempt_limit" : critic.ReasonCode,
-                attempt, critic.Diagnosis, critic.Evidence);
+                attempt, critic.Diagnosis, critic.Evidence,
+                critic.ReasonCode == "evidence.ambiguous" ? planEvent.TiedCandidates?.Select(c => c.PlaybookId).ToArray() : null);
             break;
         }
         Add("diagnostics.completed", outcome);
@@ -97,6 +101,9 @@ public sealed class DiagnosticsWorkflowService(
             new(Math.Max(0, timer.Elapsed.TotalMilliseconds - executionMs), toolMs, Math.Max(0, executionMs - toolMs)));
     }
 
+    private static PlannerPlaybookSelection Selection(PlaybookMatch match) =>
+        new(match.Playbook.PlaybookId, match.Playbook.Version, match.Score, match.MatchedTerms);
+
     public static PlannerTaskRequest BindSnapshot(PlannerTaskRequest task, RepositorySnapshotRef snapshot)
     {
         var args = new SortedDictionary<string, string>(task.Arguments.ToDictionary(p => p.Key, p => p.Value), StringComparer.Ordinal)
@@ -110,6 +117,8 @@ public sealed class DiagnosticsWorkflowService(
     {
         if (critic.Attempt != input.Planning.Attempt || critic.Decision is not ("accept" or "reject" or "inconclusive") ||
             string.IsNullOrWhiteSpace(critic.ReasonCode)) throw new InvalidOperationException("Invalid critic decision.");
+        if (input.Planning.TiedCandidates is { Count: > 1 } && (critic.Decision == "accept" || input.Steps.Count != 0))
+            throw new InvalidOperationException("Competing playbooks cannot produce an executed or accepted diagnosis.");
         if (critic.Decision != "accept")
         {
             if (critic.Diagnosis is not null || critic.Evidence.Count != 0) throw new InvalidOperationException("Rejected evidence cannot support a diagnosis.");

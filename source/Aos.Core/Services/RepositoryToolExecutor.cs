@@ -6,8 +6,9 @@ using Aos.WebApi.Models;
 
 namespace Aos.WebApi.Services;
 
+// RequiresNetwork is an operator declaration; diagnostics never grants network, so such profiles are denied unexecuted.
 public sealed record RepositoryTestProfile(
-    string Id, string SnapshotHash, string AssemblyPath, IReadOnlyList<string> Arguments, int TimeoutMs);
+    string Id, string SnapshotHash, string AssemblyPath, IReadOnlyList<string> Arguments, int TimeoutMs, bool RequiresNetwork = false);
 public sealed record RepositoryTestRun(int? ExitCode, string Stdout, string Stderr, string? Failure, double DurationMs);
 public interface IRepositoryTestRunner
 {
@@ -129,6 +130,7 @@ public sealed class RepositoryToolExecutor : IToolExecutor
                 var id = Get(input, "profileId");
                 if (!_profiles.TryGetValue(id, out var profile)) throw new RepositoryPolicyException("repo.profile.denied");
                 if (profile.SnapshotHash != _snapshot.Reference.ContentHash) throw new RepositoryPolicyException("repo.profile.snapshot_mismatch");
+                if (profile.RequiresNetwork) throw new RepositoryPolicyException("repo.network.denied");
                 var run = _runner.Run(profile);
                 error = run.Failure;
                 output = new RepositoryToolOutput(_snapshot.Reference, "test", [], false, id,

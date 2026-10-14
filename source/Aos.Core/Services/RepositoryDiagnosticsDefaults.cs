@@ -54,7 +54,9 @@ public static class RepositoryDiagnosticsDefaults
 
     public static IReadOnlyList<RepositoryTestProfile> Profiles(string hash, string workerAssembly) =>
     [new("pricing.focused", hash, Path.GetFullPath(workerAssembly), ["--repository-profile", "pricing.focused"], 2000),
-     new("pricing.broad", hash, Path.GetFullPath(workerAssembly), ["--repository-profile", "pricing.broad"], 500)];
+     new("pricing.broad", hash, Path.GetFullPath(workerAssembly), ["--repository-profile", "pricing.broad"], 500),
+     // Integration suite that fetches live exchange rates; catalogued so a request for it is denied, not unknown.
+     new("pricing.live-rates", hash, Path.GetFullPath(workerAssembly), ["--repository-profile", "pricing.live-rates"], 2000, RequiresNetwork: true)];
 
     public static IPlannerService Planner(AllowedActionCatalog catalog) => new DeterministicPlannerService(
         new DeterministicPlaybookRetriever(new InMemoryPlaybookStore(Playbooks())),

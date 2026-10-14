@@ -21,6 +21,7 @@ public sealed class RuleBasedDiagnosticsDecisions(ILocalModelCriticClient? model
         var plan = input.Planning;
         DiagnosticsCriticDecision Reject(string code, string decision = "reject") => new(plan.Attempt, decision, code, [], null);
         if (!plan.IsValid) return Reject(plan.ErrorCode == "planner.playbook.not_found" ? "evidence.none" : "plan.invalid");
+        if (plan.TiedCandidates is { Count: > 1 }) return Reject("evidence.ambiguous", "inconclusive");
         if (input.Steps.Any(s => s.ToolResult.Status == "denied")) return Reject("policy.denied");
         if (input.Steps.Any(s => s.ToolResult.Error is "repo.test.timeout" or "sandbox_timeout")) return Reject("test.timeout");
         if (input.Steps.Any(s => s.ToolResult.Status != "succeeded")) return Reject("tool.failed");

@@ -24,5 +24,6 @@
   "requiredEvidencePaths": [],
   "requiredTestProfile": null,
   "recoverable": false,
-  "expectedAttempts": 1
+  "expectedAttempts": 1,
+  "expectedDenialCode": "repo.path.denied"
 }

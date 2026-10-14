@@ -5,6 +5,8 @@ namespace Aos.WebApi.Services;
 
 public sealed class DeterministicPlannerService : IPlannerService
 {
+    // The selected playbook is unchanged; extra results only report top-score ties to callers that must not tie-break.
+    private const int MaxTiedCandidates = 16;
     private readonly DeterministicPlaybookRetriever _retriever;
     private readonly IPlannerCandidateProvider _candidateProvider;
     private readonly PlannerPlanValidator _validator;
@@ -23,8 +25,10 @@ public sealed class DeterministicPlannerService : IPlannerService
     {
         ValidateTask(task);
         var normalizedTask = SnapshotTask(task);
-        var selected = _retriever.Retrieve(
-            new PlaybookRetrievalRequest(normalizedTask.TaskClass, normalizedTask.Terms, 1)).SingleOrDefault();
+        var matches = _retriever.Retrieve(
+            new PlaybookRetrievalRequest(normalizedTask.TaskClass, normalizedTask.Terms, MaxTiedCandidates));
+        var selected = matches.FirstOrDefault();
+        PlaybookMatch[] tied = selected is null ? [] : matches.Where(match => match.Score == selected.Score).ToArray();
         if (selected is null)
         {
             return Failed(normalizedTask, "none", null, "planner.playbook.not_found", "No matching playbook was found.");
@@ -57,7 +61,8 @@ public sealed class DeterministicPlannerService : IPlannerService
             candidate.Plan,
             validation,
             validation.IsValid ? null : "planner.plan.invalid",
-            validation.IsValid ? null : "Candidate plan failed validation.");
+            validation.IsValid ? null : "Candidate plan failed validation.",
+            tied.Length > 1 ? Array.AsReadOnly(tied) : null);
     }
 
     private static PlannerTaskRequest SnapshotTask(PlannerTaskRequest task)

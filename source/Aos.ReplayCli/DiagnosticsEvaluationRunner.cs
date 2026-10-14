@@ -37,8 +37,12 @@ public static class DiagnosticsEvaluationRunner
                 foreach (var scenario in cases)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    // RDI-12 runs from a disposable copy that is deleted before replay, proving replay needs no snapshot.
+                    var staged = scenario.ReplayWithoutSnapshot
+                        ? StageSnapshot(options["--snapshot-dir"], Path.Combine(outputRoot, ".staged-snapshots", $"{scenario.CaseId}-v{retries + 1}"), scenario.Request.Snapshot)
+                        : null;
                     var config = new SandboxPoolOptions { PoolSize = 0, ExecutorType = executor,
-                        RepositorySnapshotDirectory = Path.GetFullPath(options["--snapshot-dir"]),
+                        RepositorySnapshotDirectory = staged ?? Path.GetFullPath(options["--snapshot-dir"]),
                         ContainerImage = options.GetValueOrDefault("--container-image", "aos-sandbox-worker:local") };
                     Func<ISandboxSlot> factory = executor == "container-v1" ? SandboxSlotFactory.Create(config) :
                         () => new ProcessSandboxSlot(options.GetValueOrDefault("--worker-assembly"), environmentVariables:
@@ -57,6 +61,13 @@ public static class DiagnosticsEvaluationRunner
                         new RuleBasedDiagnosticsDecisions(), RepositoryDiagnosticsDefaults.Recovery(retries), new LockedSeedProvider(new RandomSeedGenerator()),
                         clock, new DiagnosticsRuleRouter(), new HmacEventLogIntegrityChain(key, "diagnostics-evaluation"), new HmacManifestSigner(key, "diagnostics-evaluation"));
                     var artifacts = service.CreateArtifacts($"{scenario.CaseId}-v{retries + 1}-{Guid.NewGuid():N}", scenario.Request, cancellationToken);
+                    bool? snapshotRemoved = null;
+                    if (staged is not null)
+                    {
+                        pool.Dispose();
+                        Directory.Delete(staged, recursive: true);
+                        snapshotRemoved = !Directory.Exists(staged);
+                    }
                     var dir = Path.Combine(outputRoot, $"planner-v{retries + 1}", scenario.CaseId);
                     Directory.CreateDirectory(dir);
                     await File.WriteAllTextAsync(Path.Combine(dir, "manifest.json"), JsonSerializer.Serialize(artifacts.ManifestRecord, RepositoryToolExecutor.JsonOptions) + "\n", cancellationToken);
@@ -66,7 +77,7 @@ public static class DiagnosticsEvaluationRunner
                     using var replayOut = new StringWriter();
                     using var replayError = new StringWriter();
                     var replay = await ReplayCliRunner.RunAsync(["--workflow", "diagnostics", "--artifact-dir", dir, "--hmac-key", key], replayOut, replayError, cancellationToken) == 0;
-                    var metrics = Measure(scenario, artifacts, replay, retries == 1);
+                    var metrics = Measure(scenario, artifacts, replay, retries == 1, snapshotRemoved);
                     (retries == 0 ? v1 : v2).Add(metrics);
                     await stdout.WriteLineAsync($"Planner v{retries + 1} {scenario.CaseId}: {(metrics.TaskSuccess ? "PASS" : "FAIL")} {metrics.Outcome} ({metrics.ReasonCode}), replay={(replay ? "PASS" : "FAIL")}");
                     if (!replay) await stderr.WriteLineAsync(replayError.ToString());
@@ -75,12 +86,13 @@ public static class DiagnosticsEvaluationRunner
             var improvement = cases.Where(c => c.Recoverable).Sum(c =>
                 (v2.Single(m => m.CaseId == c.CaseId).TaskSuccess ? 1 : 0) - (v1.Single(m => m.CaseId == c.CaseId).TaskSuccess ? 1 : 0));
             var regression = cases.Where(c => !c.Recoverable).Any(c => v1.Single(m => m.CaseId == c.CaseId).TaskSuccess && !v2.Single(m => m.CaseId == c.CaseId).TaskSuccess);
-            var passed = v2.All(m => m.TaskSuccess && m.ReplayEquivalent && m.EvidenceGroundingPassed && m.ProhibitedActionRejected != false) &&
+            var passed = v2.All(m => m.TaskSuccess && m.ReplayEquivalent && m.EvidenceGroundingPassed && m.ProhibitedActionRejected != false &&
+                    m.SnapshotRemovedBeforeReplay != false) &&
                 v1.All(m => m.ReplayEquivalent) && improvement > 0 && !regression;
             var report = new DiagnosticsEvaluationReport(DiagnosticsSchema.Version, executor, snapshot.Reference, v1, v2,
                 v1.Count(m => m.TaskSuccess), v2.Count(m => m.TaskSuccess), improvement, regression, passed);
             await File.WriteAllTextAsync(Path.Combine(outputRoot, "report.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions(RepositoryToolExecutor.JsonOptions) { WriteIndented = true }) + "\n", cancellationToken);
-            await stdout.WriteLineAsync($"September gate: {(passed ? "PASS" : "FAIL")}; v1={report.V1Successes}/{cases.Length}, v2={report.V2Successes}/{cases.Length}; recoverable improvement={improvement}; non-recovery regression={regression}.");
+            await stdout.WriteLineAsync($"Diagnostics gate: {(passed ? "PASS" : "FAIL")}; v1={report.V1Successes}/{cases.Length}, v2={report.V2Successes}/{cases.Length}; recoverable improvement={improvement}; non-recovery regression={regression}.");
             return passed ? 0 : 1;
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or RepositoryPolicyException or InvalidOperationException or JsonException)
@@ -90,7 +102,8 @@ public static class DiagnosticsEvaluationRunner
         }
     }
 
-    public static DiagnosticsCaseMetrics Measure(DiagnosticsEvaluationCase expected, DiagnosticsWorkflowArtifacts artifacts, bool replay, bool v2)
+    public static DiagnosticsCaseMetrics Measure(DiagnosticsEvaluationCase expected, DiagnosticsWorkflowArtifacts artifacts, bool replay, bool v2,
+        bool? snapshotRemovedBeforeReplay = null)
     {
         var plans = Read<DiagnosticsPlanEvent>(artifacts, "diagnostics.plan");
         var tools = Read<ToolExecutionEvent>(artifacts, "tool.execution");
@@ -99,15 +112,32 @@ public static class DiagnosticsEvaluationRunner
         var outcome = artifacts.Outcome;
         var grounding = outcome.Status != "succeeded" || outcome.Evidence.Count > 0 && outcome.Evidence.All(e =>
             tools.Any(t => t.InvocationId == e.InvocationId && t.Status == "succeeded"));
+        // Plan rejection must stop before any tool call; tool-level denials must carry the case's stable policy code.
         bool? prohibited = expected.ExpectedStatus == "denied" ? outcome.Status == "denied" &&
-            (expected.CaseId == "RDI-10" ? tools.Count == 0 && plans.All(p => !p.IsValid) : tools.Any(t => t.Status == "denied" && t.Error == "repo.path.denied")) : null;
+            (expected.ExpectedDenialCode == "planner.plan.invalid"
+                ? tools.Count == 0 && plans.All(p => !p.IsValid && p.ErrorCode == expected.ExpectedDenialCode)
+                : expected.ExpectedDenialCode is not null && tools.Any(t => t.Status == "denied" && t.Error == expected.ExpectedDenialCode)) : null;
         return new(expected.CaseId, DiagnosticsCaseScorer.Score(expected, outcome, tools, v2),
             plans.Count == 0 ? 0 : (double)plans.Count(p => p.IsValid) / plans.Count, grounding,
             tools.Count == 0 ? 0 : (double)tools.Count(t => t.Status == "succeeded") / tools.Count,
             critics.Where(c => c.Decision != "accept").Select(c => c.ReasonCode).ToArray(),
             recoveries.Count(r => r.NextTask is not null), outcome.Status == "succeeded" && outcome.Attempts > 1,
             prohibited, replay, artifacts.Timing?.PlannerOverheadMs ?? 0, artifacts.Timing?.ToolDurationMs ?? 0,
-            artifacts.Timing?.SandboxOverheadMs ?? 0, outcome.Status, outcome.ReasonCode);
+            artifacts.Timing?.SandboxOverheadMs ?? 0, outcome.Status, outcome.ReasonCode, snapshotRemovedBeforeReplay);
+    }
+
+    private static string StageSnapshot(string source, string target, RepositorySnapshotRef expected)
+    {
+        source = Path.GetFullPath(source);
+        if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var destination = Path.Combine(target, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination);
+        }
+        RepositorySnapshot.Import(target, RepositoryDiagnosticsDefaults.Revision, RepositoryDiagnosticsDefaults.CreatedAt).Verify(expected);
+        return target;
     }
 
     private static IReadOnlyList<T> Read<T>(DiagnosticsWorkflowArtifacts artifacts, string type) =>

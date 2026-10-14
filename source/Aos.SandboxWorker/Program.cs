@@ -6,6 +6,7 @@ if (args.Length == 2 && args[0] == "--repository-profile")
 {
     if (args[1] == "pricing.broad") { await Task.Delay(TimeSpan.FromSeconds(30)); return 0; }
     if (args[1] == "pricing.focused") return RepositoryFixture.Pricing.PricingTests.RunFocused();
+    if (args[1] == "pricing.live-rates") return await LiveRatesProbeAsync();
     return 2;
 }
 
@@ -129,6 +130,24 @@ static async Task<ToolExecutionResult> RunNetworkProbeAsync(ToolExecutionRequest
     }
 
     return ProbeResult(request, new { allowed });
+}
+
+// Packaged body of the network-requiring profile. Diagnostics policy denies it before this runs;
+// if reached, the hardened container's disabled network makes it fail rather than fetch rates.
+static async Task<int> LiveRatesProbeAsync()
+{
+    try
+    {
+        using var client = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
+        using var response = await client.GetAsync("http://1.1.1.1");
+        Console.WriteLine("PASS PricingIntegrationTests.LiveRates: network reachable");
+        return 0;
+    }
+    catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+    {
+        Console.WriteLine("FAIL PricingIntegrationTests.LiveRates: network unavailable");
+        return 1;
+    }
 }
 
 static ToolExecutionResult RunEnvironmentProbe(ToolExecutionRequest request)

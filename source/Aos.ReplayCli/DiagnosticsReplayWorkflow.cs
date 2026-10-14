@@ -48,11 +48,12 @@ internal sealed class DiagnosticsReplayWorkflow : IReplayWorkflow
             if (!_events.TryDequeue(out var recorded) ||
                 JsonSerializer.Serialize(task, RepositoryToolExecutor.JsonOptions) != JsonSerializer.Serialize(recorded.Task, RepositoryToolExecutor.JsonOptions))
                 throw new InvalidOperationException("Recorded diagnostics task differs from replay task.");
-            PlaybookMatch? selected = recorded.Selection is null ? null : new PlaybookMatch(
-                new PlannerPlaybook("0.1", recorded.Selection.PlaybookId, recorded.Selection.Version, task.TaskClass,
-                    "recorded", [], []), recorded.Selection.Score, recorded.Selection.MatchedTerms);
-            return new(recorded.IsValid ? "validated" : "rejected", recorded.Task, selected, recorded.CandidateSource,
-                recorded.Plan, new(recorded.IsValid, []), recorded.ErrorCode, null);
+            PlaybookMatch Match(PlannerPlaybookSelection selection) => new(
+                new PlannerPlaybook("0.1", selection.PlaybookId, selection.Version, task.TaskClass,
+                    "recorded", [], []), selection.Score, selection.MatchedTerms);
+            return new(recorded.IsValid ? "validated" : "rejected", recorded.Task,
+                recorded.Selection is null ? null : Match(recorded.Selection), recorded.CandidateSource,
+                recorded.Plan, new(recorded.IsValid, []), recorded.ErrorCode, null, recorded.TiedCandidates?.Select(Match).ToArray());
         }
     }
 
