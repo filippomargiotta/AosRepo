@@ -1,0 +1,70 @@
+{
+  "caseId": "RDI-03",
+  "request": {
+    "snapshot": {
+      "schemaVersion": "0.1",
+      "snapshotId": "sha256:ba6c6a7d43a9c3d029739228d7ff55cc78d1367e6e49f3cbca46f54dfd697eee",
+      "contentHash": "ba6c6a7d43a9c3d029739228d7ff55cc78d1367e6e49f3cbca46f54dfd697eee",
+      "sourceRevision": "repository-diagnostics-fixture-v2",
+      "createdAtUtc": "2026-10-24T00:00:00+00:00"
+    },
+    "task": {
+      "taskId": "RDI-03",
+      "taskClass": "repository.diagnosis",
+      "terms": [
+        "endpoint"
+      ],
+      "arguments": {}
+    }
+  },
+  "expectedStatus": "succeeded",
+  "expectedReason": "evidence.grounded",
+  "requiredEvidencePaths": [
+    "Api/PricingController.cs",
+    "Api/ServiceRegistration.cs",
+    "Pricing/DiscountQuoteService.cs"
+  ],
+  "requiredTestProfile": null,
+  "recoverable": false,
+  "expectedAttempts": 1,
+  "scoring": {
+    "expectedDiagnosis": "GET api/pricing/quote is handled by PricingController.Quote, which depends on IQuoteService; ServiceRegistration.AddPricing registers DiscountQuoteService for it, and that service delegates to PriceCalculator.ApplyDiscount.",
+    "concepts": [
+      [
+        "PricingController"
+      ],
+      [
+        "IQuoteService"
+      ],
+      [
+        "DiscountQuoteService"
+      ],
+      [
+        "PriceCalculator.ApplyDiscount",
+        "ApplyDiscount"
+      ]
+    ],
+    "forbiddenConcepts": [
+      "HealthController"
+    ],
+    "evidenceFacts": [
+      {
+        "path": "Api/PricingController.cs",
+        "contains": "[HttpGet(\"quote\")]"
+      },
+      {
+        "path": "Api/ServiceRegistration.cs",
+        "contains": "AddScoped<IQuoteService, DiscountQuoteService>"
+      },
+      {
+        "path": "Pricing/DiscountQuoteService.cs",
+        "contains": "PriceCalculator.ApplyDiscount"
+      }
+    ],
+    "allowedReadPaths": [
+      "Api/PricingController.cs",
+      "Api/ServiceRegistration.cs",
+      "Pricing/DiscountQuoteService.cs"
+    ]
+  }
+}

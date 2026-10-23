@@ -27,5 +27,43 @@
   ],
   "requiredTestProfile": "pricing.focused",
   "recoverable": false,
-  "expectedAttempts": 1
+  "expectedAttempts": 1,
+  "scoring": {
+    "expectedDiagnosis": "ApplyDiscount returns the discount amount (20) instead of the remaining price (80); its multiplication omits the complement of the discount.",
+    "concepts": [
+      [
+        "ApplyDiscount"
+      ],
+      [
+        "discount amount",
+        "discount value"
+      ],
+      [
+        "remaining price",
+        "price after discount"
+      ],
+      [
+        "80"
+      ]
+    ],
+    "forbiddenConcepts": [
+      "rounding",
+      "sales tax",
+      "currency conversion"
+    ],
+    "evidenceFacts": [
+      {
+        "path": "Pricing/PriceCalculator.cs",
+        "contains": "=> price * discount"
+      },
+      {
+        "path": "Pricing/PricingTests.cs",
+        "contains": "expected = 80m"
+      }
+    ],
+    "allowedReadPaths": [
+      "Pricing/PriceCalculator.cs",
+      "Pricing/PricingTests.cs"
+    ]
+  }
 }

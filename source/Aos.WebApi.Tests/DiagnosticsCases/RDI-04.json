@@ -1,0 +1,72 @@
+{
+  "caseId": "RDI-04",
+  "request": {
+    "snapshot": {
+      "schemaVersion": "0.1",
+      "snapshotId": "sha256:ba6c6a7d43a9c3d029739228d7ff55cc78d1367e6e49f3cbca46f54dfd697eee",
+      "contentHash": "ba6c6a7d43a9c3d029739228d7ff55cc78d1367e6e49f3cbca46f54dfd697eee",
+      "sourceRevision": "repository-diagnostics-fixture-v2",
+      "createdAtUtc": "2026-10-24T00:00:00+00:00"
+    },
+    "task": {
+      "taskId": "RDI-04",
+      "taskClass": "repository.diagnosis",
+      "terms": [
+        "dependency"
+      ],
+      "arguments": {}
+    }
+  },
+  "expectedStatus": "succeeded",
+  "expectedReason": "evidence.grounded",
+  "requiredEvidencePaths": [
+    "Dependencies/RepositoryFixture.csproj.txt",
+    "Dependencies/project.assets.json",
+    "Dependencies/advisory-notes.txt"
+  ],
+  "requiredTestProfile": null,
+  "recoverable": false,
+  "expectedAttempts": 1,
+  "scoring": {
+    "expectedDiagnosis": "Newtonsoft.Json 9.0.1, which the recorded advisory flags, enters the project transitively through the direct package Contoso.Reports 2.1.0; the other direct package, Contoso.Telemetry, does not reference it.",
+    "concepts": [
+      [
+        "Contoso.Reports"
+      ],
+      [
+        "Newtonsoft.Json 9.0.1"
+      ],
+      [
+        "transitive",
+        "transitively",
+        "indirect"
+      ],
+      [
+        "advisory"
+      ]
+    ],
+    "forbiddenConcepts": [
+      "introduced by Contoso.Telemetry",
+      "Contoso.Telemetry introduces"
+    ],
+    "evidenceFacts": [
+      {
+        "path": "Dependencies/RepositoryFixture.csproj.txt",
+        "contains": "Include=\"Contoso.Reports\""
+      },
+      {
+        "path": "Dependencies/project.assets.json",
+        "contains": "\"Newtonsoft.Json\": \"9.0.1\""
+      },
+      {
+        "path": "Dependencies/advisory-notes.txt",
+        "contains": "Newtonsoft.Json below 13.0.1"
+      }
+    ],
+    "allowedReadPaths": [
+      "Dependencies/RepositoryFixture.csproj.txt",
+      "Dependencies/project.assets.json",
+      "Dependencies/advisory-notes.txt"
+    ]
+  }
+}

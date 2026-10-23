@@ -26,5 +26,50 @@
   ],
   "requiredTestProfile": null,
   "recoverable": false,
-  "expectedAttempts": 1
+  "expectedAttempts": 1,
+  "scoring": {
+    "expectedDiagnosis": "In Development, appsettings.Development.json overrides SandboxPool.PoolSize from 4 to 0 because CreateBuilder loads environment configuration after the base file.",
+    "concepts": [
+      [
+        "appsettings.Development.json"
+      ],
+      [
+        "PoolSize"
+      ],
+      [
+        "overrides",
+        "overrode",
+        "takes precedence"
+      ],
+      [
+        "4"
+      ],
+      [
+        "0"
+      ]
+    ],
+    "forbiddenConcepts": [
+      "command line argument",
+      "environment variable overrides"
+    ],
+    "evidenceFacts": [
+      {
+        "path": "appsettings.json",
+        "contains": "\"PoolSize\": 4"
+      },
+      {
+        "path": "appsettings.Development.json",
+        "contains": "\"PoolSize\": 0"
+      },
+      {
+        "path": "Configuration/Program.cs",
+        "contains": "WebApplication.CreateBuilder"
+      }
+    ],
+    "allowedReadPaths": [
+      "appsettings.json",
+      "appsettings.Development.json",
+      "Configuration/Program.cs"
+    ]
+  }
 }

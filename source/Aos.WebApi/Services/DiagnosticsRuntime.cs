@@ -16,7 +16,7 @@ public sealed class DiagnosticsRuntime : IDisposable
     {
         if (configured.ExecutorType != "container-v1")
             throw new InvalidOperationException("Repository diagnostics API requires the hardened container backend.");
-        Snapshot = RepositorySnapshot.Import(snapshotRoot, RepositoryDiagnosticsDefaults.Revision, RepositoryDiagnosticsDefaults.CreatedAt);
+        Snapshot = RepositoryDiagnosticsDefaults.ImportFixture(snapshotRoot);
         var options = new SandboxPoolOptions
         {
             PoolSize = configured.PoolSize, ExecutorType = configured.ExecutorType, ContainerImage = configured.ContainerImage,

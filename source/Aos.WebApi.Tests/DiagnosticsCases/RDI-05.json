@@ -1,0 +1,68 @@
+{
+  "caseId": "RDI-05",
+  "request": {
+    "snapshot": {
+      "schemaVersion": "0.1",
+      "snapshotId": "sha256:ba6c6a7d43a9c3d029739228d7ff55cc78d1367e6e49f3cbca46f54dfd697eee",
+      "contentHash": "ba6c6a7d43a9c3d029739228d7ff55cc78d1367e6e49f3cbca46f54dfd697eee",
+      "sourceRevision": "repository-diagnostics-fixture-v2",
+      "createdAtUtc": "2026-10-24T00:00:00+00:00"
+    },
+    "task": {
+      "taskId": "RDI-05",
+      "taskClass": "repository.diagnosis",
+      "terms": [
+        "replay"
+      ],
+      "arguments": {}
+    }
+  },
+  "expectedStatus": "succeeded",
+  "expectedReason": "evidence.grounded",
+  "requiredEvidencePaths": [
+    "Replay/ReplayComparer.cs",
+    "Replay/last-replay-report.txt"
+  ],
+  "requiredTestProfile": null,
+  "recoverable": false,
+  "expectedAttempts": 1,
+  "scoring": {
+    "expectedDiagnosis": "Replay reports a mismatch in route.selectedModel: ReplayComparer compares the recorded selected model with the replayed one, and the report shows recorded local-small against replayed local-large because the replayed run selected its model from live router configuration instead of the recorded decision.",
+    "concepts": [
+      [
+        "route.selectedModel"
+      ],
+      [
+        "ReplayComparer"
+      ],
+      [
+        "local-small"
+      ],
+      [
+        "local-large"
+      ],
+      [
+        "live router configuration",
+        "live router config"
+      ]
+    ],
+    "forbiddenConcepts": [
+      "eventLog.eventCount mismatch",
+      "manifest.runId mismatch"
+    ],
+    "evidenceFacts": [
+      {
+        "path": "Replay/ReplayComparer.cs",
+        "contains": "\"route.selectedModel\""
+      },
+      {
+        "path": "Replay/last-replay-report.txt",
+        "contains": "mismatch field=route.selectedModel recorded=local-small replayed=local-large"
+      }
+    ],
+    "allowedReadPaths": [
+      "Replay/ReplayComparer.cs",
+      "Replay/last-replay-report.txt"
+    ]
+  }
+}

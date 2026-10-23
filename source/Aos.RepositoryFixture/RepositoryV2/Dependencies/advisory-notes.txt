@@ -1,0 +1,2 @@
+Recorded advisory data; the workflow never looks up advisories over the network.
+Newtonsoft.Json below 13.0.1 is flagged by GHSA-5crp-9r3c-p9vr (improper handling of expected exceptions).

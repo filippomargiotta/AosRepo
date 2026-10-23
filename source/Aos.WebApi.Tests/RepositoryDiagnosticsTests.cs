@@ -10,15 +10,18 @@ public sealed class RepositoryDiagnosticsTests
 {
     private static readonly DateTimeOffset Instant = new(2026, 9, 30, 12, 0, 0, TimeSpan.Zero);
     internal static string SnapshotRoot => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Aos.RepositoryFixture", "Repository"));
+    internal static string SnapshotRootV2 => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Aos.RepositoryFixture", "RepositoryV2"));
     internal static string CasesRoot => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "DiagnosticsCases"));
-    private static RepositorySnapshot Snapshot() => RepositorySnapshot.Import(SnapshotRoot, RepositoryDiagnosticsDefaults.Revision, RepositoryDiagnosticsDefaults.CreatedAt);
+    private static RepositorySnapshot Snapshot() => RepositoryDiagnosticsDefaults.ImportFixture(SnapshotRoot);
+    private static RepositorySnapshot SnapshotFor(DiagnosticsEvaluationCase scenario) =>
+        RepositoryDiagnosticsDefaults.ImportFixture(scenario.Request.Snapshot.ContentHash == RepositoryDiagnosticsDefaults.FixtureV2ContentHash ? SnapshotRootV2 : SnapshotRoot);
     internal static IReadOnlyList<DiagnosticsEvaluationCase> Cases() => Directory.EnumerateFiles(CasesRoot, "*.json").Order(StringComparer.Ordinal)
         .Select(p => JsonSerializer.Deserialize<DiagnosticsEvaluationCase>(File.ReadAllText(p), RepositoryToolExecutor.JsonOptions)!).ToArray();
 
     internal static DiagnosticsWorkflowArtifacts Run(DiagnosticsEvaluationCase scenario, int retries = 1,
         IDiagnosticsDecisions? decisions = null, IPlannerService? planner = null, IToolExecutor? tools = null)
     {
-        var snapshot = Snapshot();
+        var snapshot = SnapshotFor(scenario);
         snapshot.Verify(scenario.Request.Snapshot);
         var catalog = RepositoryDiagnosticsDefaults.Catalog();
         var capabilities = CapabilityTestData.CreateTokenService();
@@ -45,7 +48,7 @@ public sealed class RepositoryDiagnosticsTests
         var v1 = new List<DiagnosticsCaseMetrics>();
         var v2 = new List<DiagnosticsCaseMetrics>();
         var cases = Cases();
-        Assert.Equal(["RDI-01", "RDI-02", "RDI-06", "RDI-07", "RDI-08", "RDI-09", "RDI-10", "RDI-11", "RDI-12"], cases.Select(c => c.CaseId));
+        Assert.Equal(["RDI-01", "RDI-02", "RDI-03", "RDI-04", "RDI-05", "RDI-06", "RDI-07", "RDI-08", "RDI-09", "RDI-10", "RDI-11", "RDI-12"], cases.Select(c => c.CaseId));
         foreach (var scenario in cases)
         {
             var original = Run(scenario, 0);
@@ -299,7 +302,7 @@ public sealed class RepositoryDiagnosticsTests
         var dir = GoldenArtifactTestSupport.CreateTempDir("aos-september-container-report");
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
-        var result = await DiagnosticsEvaluationRunner.RunAsync(["--snapshot-dir", SnapshotRoot, "--cases-root", CasesRoot,
+        var result = await DiagnosticsEvaluationRunner.RunAsync(["--snapshot-dir", SnapshotRoot, "--snapshot-dir-v2", SnapshotRootV2, "--cases-root", CasesRoot,
             "--output-dir", dir, "--hmac-key", GoldenArtifactTestSupport.GoldenHmacKey, "--executor", "container-v1"], stdout, stderr, CancellationToken.None);
         Assert.True(result == 0, stdout + "\n" + stderr);
     }

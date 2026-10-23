@@ -14,7 +14,7 @@ RepositoryToolExecutor? repositoryExecutor = null;
 var snapshotRoot = Environment.GetEnvironmentVariable("AOS_REPOSITORY_SNAPSHOT_ROOT");
 if (snapshotRoot is not null)
 {
-    var snapshot = RepositorySnapshot.Import(snapshotRoot, RepositoryDiagnosticsDefaults.Revision, RepositoryDiagnosticsDefaults.CreatedAt);
+    var snapshot = RepositoryDiagnosticsDefaults.ImportFixture(snapshotRoot);
     var packaged = RepositorySnapshot.Import(Path.Combine(AppContext.BaseDirectory, "repository-fixture"),
         RepositoryDiagnosticsDefaults.Revision, RepositoryDiagnosticsDefaults.CreatedAt);
     repositoryExecutor = new RepositoryToolExecutor(snapshot,

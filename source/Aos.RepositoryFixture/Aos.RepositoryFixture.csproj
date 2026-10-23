@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Repository/Configuration/Program.cs" />
+    <Compile Remove="RepositoryV2/**" />
   </ItemGroup>
 </Project>

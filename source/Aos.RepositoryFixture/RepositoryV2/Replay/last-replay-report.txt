@@ -1,0 +1,3 @@
+replay verification failed
+mismatch field=route.selectedModel recorded=local-small replayed=local-large
+note=the replayed run selected its model from live router configuration
