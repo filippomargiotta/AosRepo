@@ -20,14 +20,14 @@ public sealed record DiagnosticsCaseMetrics(
     bool ReplayEquivalent, double PlannerOverheadMs, double ToolDurationMs, double SandboxOverheadMs, string Outcome, string ReasonCode,
     bool? SnapshotRemovedBeforeReplay = null, double ExactScore = 1, double SemanticScore = 1,
     IReadOnlyList<string>? ScoreFailures = null, bool AllowedActionsValid = true,
-    DiagnosticsStageResults? Stages = null, IReadOnlyList<DiagnosticsToolCallRow>? ToolCalls = null);
+    DiagnosticsStageResults? Stages = null, IReadOnlyList<DiagnosticsToolCallRow>? ToolCalls = null, double? Confidence = null);
 public sealed record DiagnosticsEvaluationReport(
     string SchemaVersion, string Executor, RepositorySnapshotRef Snapshot,
     IReadOnlyList<DiagnosticsCaseMetrics> PlannerV1, IReadOnlyList<DiagnosticsCaseMetrics> PlannerV2,
     int V1Successes, int V2Successes, int RecoverableSuccessImprovement, bool NonRecoveryRegressed, bool Passed,
     IReadOnlyList<RepositorySnapshotRef>? Snapshots = null, DiagnosticsGateThresholds? Thresholds = null,
     IReadOnlyList<DiagnosticsGateCheck>? GateChecks = null, DiagnosticsStageSummary? StageSummary = null,
-    IReadOnlyList<string>? Regressions = null);
+    IReadOnlyList<string>? Regressions = null, ConfidenceCalibration? Calibration = null);
 public sealed record DiagnosticsGateThresholds(int MinCases, int MinSuccesses);
 public sealed record DiagnosticsGateCheck(string Name, bool Passed, string Detail);
 public sealed record DiagnosticsStageCount(int Passed, int Failed, IReadOnlyList<string> FailedCases);

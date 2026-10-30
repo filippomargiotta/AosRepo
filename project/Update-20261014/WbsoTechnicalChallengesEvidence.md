@@ -2,7 +2,7 @@
 
 **Project:** AI-Driven Agentic Orchestration Software (AOC-WebAPI)\
 **Period:** 1 January–31 December 2026\
-**Evidence status date:** 30 September 2026\
+**Evidence status date:** 30 October 2026\
 **Purpose:** working technical-project record for the WBSO administration
 
 This document connects the technical bottlenecks in the original WBSO application to the experiments, failures, implementation decisions, tests, and measurements recorded in this repository. It is not a substitute for the approved application, the hours registration, or advice from the WBSO adviser. Only work actually performed should be entered in the administration.
@@ -282,6 +282,37 @@ The following items belong to the future plan. September's bounded experiments a
   `source/Aos.WebApi.Tests/RepositoryDiagnosticsTests.cs`,
   `source/Aos.WebApi.Tests/RepositoryToolsTests.cs`. Source is an uncommitted working-tree
   implementation based on `7dab9ed`; the evidence metadata retains its source-tree digest.
+- **Hours registration:** maintained separately by the owner; no hours were entered by this task.
+
+## October 2026 — TC5 semantic scoring and confidence calibration
+
+- **Date / period:** 1–30 October 2026. **Bottleneck:** TC5 (evaluation), applied to the TC3/TC4 diagnostics demonstrator.
+- **Uncertainty 1:** can exact evidence scoring plus bounded semantic scoring accept harmless wording changes without accepting
+  unsupported diagnoses?
+- **Prototype:** twelve checked-in cases (fixture v1 plus a coordinated fixture v2 for endpoint tracing, dependency-chain, and
+  replay-mismatch diagnosis), operator-authored concept groups, forbidden concepts, evidence-fact and read-scope checks, and a
+  per-stage (planning/tool/evidence/recovery/replay) regression report with baseline comparison.
+- **Observed result:** mutation tests accept reworded diagnoses and reject wrong-cause, forbidden-claim, incomplete, wrong-line,
+  missing-evidence, out-of-scope-read, and confident-when-ambiguous results. Hardened-container task success was v1 **10/12 → v2 12/12**
+  with recoverable improvement 2, 100% allowed-action validity, 3/3 prohibited actions rejected, and 24/24 runs replayed. Mid-October,
+  an equal-score tie in retrieval was found to yield a confident diagnosis by lexical tie-break; ambiguity is now an `inconclusive` outcome.
+- **Uncertainty 2:** can confidence values be calibrated reproducibly on a small realistic dataset?
+- **Prototype:** a runtime-only confidence from recorded signals, order-independent reliability bins, Brier/ECE, and stored accept/abstain
+  thresholds bound to the observation hash, verified in the gate.
+- **Observed result:** calibration is reproducible (identical output from reordered input) and thresholds are stored (accept >= 0.85; 14
+  claims, Brier 0.0046, ECE 0.05). **All 14 claims were correct, so the thresholds are not validated against false accepts; ECE measures
+  under-confidence only.** The confidence formula is a hand-set prior.
+- **Alternatives considered:** learned semantic similarity (rejected: not reproducible offline without an embedding model); synthetic wrong
+  claims as negative samples (rejected: confidence uses runtime signals, so relabelled text would not test discrimination).
+- **Conclusion and next decision:** the scoring principle is demonstrated for the bounded dataset; calibration reproducibility is demonstrated,
+  discrimination is not. November: obtain incorrect claims via injected regressions and repeated runs, and revisit thresholds then.
+- **Remaining limitation:** semantic concepts are hand-authored; the local-model column was not run; the dataset is small.
+- **Verification:** 177 standard tests passed (8 container skipped); 187 with containers; 19 golden scenarios; offline replay of 24 runs in a
+  network-disabled container.
+- **Evidence:** [October deliverable](deliverables/2026-10.md), [report](evidence/2026-10/container/report.json),
+  [calibration](evidence/2026-10/container/calibration.json), [verification](evidence/2026-10/verification.json),
+  `source/Aos.Core/Models/DiagnosticsCalibration.cs`, `source/Aos.WebApi.Tests/DiagnosticsScoringTests.cs`. Source is an uncommitted
+  working-tree implementation based on `cf5b39b`.
 - **Hours registration:** maintained separately by the owner; no hours were entered by this task.
 
 ## Update template for each new experiment

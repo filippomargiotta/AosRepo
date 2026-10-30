@@ -1,0 +1,1478 @@
+{
+  "schemaVersion": "0.1",
+  "executor": "container-v1",
+  "snapshot": {
+    "schemaVersion": "0.1",
+    "snapshotId": "sha256:6c13d7a97ce3587b55e39073f7394316954ea94a79f8dad5e063e0de8670c9f9",
+    "contentHash": "6c13d7a97ce3587b55e39073f7394316954ea94a79f8dad5e063e0de8670c9f9",
+    "sourceRevision": "repository-diagnostics-fixture-v1",
+    "createdAtUtc": "2026-09-30T00:00:00+00:00"
+  },
+  "plannerV1": [
+    {
+      "caseId": "RDI-01",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 28.4820000000002,
+      "toolDurationMs": 232.775333,
+      "sandboxOverheadMs": 983.6281669999998,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.test",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "caseId": "RDI-02",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.5841000000000349,
+      "toolDurationMs": 72.872333,
+      "sandboxOverheadMs": 790.352367,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "caseId": "RDI-03",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.5319000000000642,
+      "toolDurationMs": 131.40554,
+      "sandboxOverheadMs": 868.67566,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "caseId": "RDI-04",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.41190000000005966,
+      "toolDurationMs": 61.818,
+      "sandboxOverheadMs": 923.7089,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "caseId": "RDI-05",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.47669999999993706,
+      "toolDurationMs": 47.818957999999995,
+      "sandboxOverheadMs": 666.9014420000001,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "caseId": "RDI-06",
+      "taskSuccess": false,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0.75,
+      "criticRejectionReasons": [
+        "test.timeout"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.7190000000000509,
+      "toolDurationMs": 644.1307099999999,
+      "sandboxOverheadMs": 927.12849,
+      "outcome": "failed",
+      "reasonCode": "recovery.attempt_limit",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 0.3333333333333333,
+      "semanticScore": 1,
+      "scoreFailures": [
+        "status:failed",
+        "reason:recovery.attempt_limit"
+      ],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": false,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.test",
+          "status": "failed",
+          "error": "repo.test.timeout"
+        }
+      ],
+      "confidence": null
+    },
+    {
+      "caseId": "RDI-07",
+      "taskSuccess": false,
+      "validPlanRate": 0,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "evidence.none"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.1732,
+      "toolDurationMs": 0,
+      "sandboxOverheadMs": 0,
+      "outcome": "failed",
+      "reasonCode": "recovery.attempt_limit",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 0.3333333333333333,
+      "semanticScore": 1,
+      "scoreFailures": [
+        "status:failed",
+        "reason:recovery.attempt_limit"
+      ],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": false,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [],
+      "confidence": null
+    },
+    {
+      "caseId": "RDI-08",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "evidence.ambiguous"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.5913,
+      "toolDurationMs": 0,
+      "sandboxOverheadMs": 0,
+      "outcome": "inconclusive",
+      "reasonCode": "evidence.ambiguous",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [],
+      "confidence": null
+    },
+    {
+      "caseId": "RDI-09",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "policy.denied"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": true,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.2441000000000031,
+      "toolDurationMs": 10.140208,
+      "sandboxOverheadMs": 209.299492,
+      "outcome": "denied",
+      "reasonCode": "policy.denied",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.read",
+          "status": "denied",
+          "error": "repo.path.denied"
+        }
+      ],
+      "confidence": null
+    },
+    {
+      "caseId": "RDI-10",
+      "taskSuccess": true,
+      "validPlanRate": 0,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "plan.invalid"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": true,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.1335,
+      "toolDurationMs": 0,
+      "sandboxOverheadMs": 0,
+      "outcome": "denied",
+      "reasonCode": "plan.invalid",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [],
+      "confidence": null
+    },
+    {
+      "caseId": "RDI-11",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0.75,
+      "criticRejectionReasons": [
+        "policy.denied"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": true,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.22900000000004184,
+      "toolDurationMs": 66.112792,
+      "sandboxOverheadMs": 877.315808,
+      "outcome": "denied",
+      "reasonCode": "policy.denied",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.test",
+          "status": "denied",
+          "error": "repo.network.denied"
+        }
+      ],
+      "confidence": null
+    },
+    {
+      "caseId": "RDI-12",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.33799999999996544,
+      "toolDurationMs": 92.307668,
+      "sandboxOverheadMs": 863.740332,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": true,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.test",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 1
+    }
+  ],
+  "plannerV2": [
+    {
+      "caseId": "RDI-01",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.38819999999998345,
+      "toolDurationMs": 90.67637500000001,
+      "sandboxOverheadMs": 872.203625,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.test",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 1
+    },
+    {
+      "caseId": "RDI-02",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.33310000000005857,
+      "toolDurationMs": 138.804792,
+      "sandboxOverheadMs": 876.2017079999999,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "caseId": "RDI-03",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.33539999999993597,
+      "toolDurationMs": 134.991625,
+      "sandboxOverheadMs": 868.202975,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "caseId": "RDI-04",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.34029999999984284,
+      "toolDurationMs": 118.27391599999999,
+      "sandboxOverheadMs": 912.0237840000001,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "caseId": "RDI-05",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.3287000000000262,
+      "toolDurationMs": 144.281875,
+      "sandboxOverheadMs": 675.636125,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 0.95
+    },
+    {
+      "caseId": "RDI-06",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0.875,
+      "criticRejectionReasons": [
+        "test.timeout"
+      ],
+      "recoveryAttempts": 1,
+      "recoverySucceeded": true,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.7305999999998676,
+      "toolDurationMs": 917.723708,
+      "sandboxOverheadMs": 1707.7187920000001,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.test",
+          "status": "failed",
+          "error": "repo.test.timeout"
+        },
+        {
+          "index": 5,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 6,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 7,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 8,
+          "toolId": "repo.test",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 0.85
+    },
+    {
+      "caseId": "RDI-07",
+      "taskSuccess": true,
+      "validPlanRate": 0.5,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [
+        "evidence.none"
+      ],
+      "recoveryAttempts": 1,
+      "recoverySucceeded": true,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.4455000000000382,
+      "toolDurationMs": 199.427708,
+      "sandboxOverheadMs": 875.710192,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.test",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 0.85
+    },
+    {
+      "caseId": "RDI-08",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "evidence.ambiguous"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.1629,
+      "toolDurationMs": 0,
+      "sandboxOverheadMs": 0,
+      "outcome": "inconclusive",
+      "reasonCode": "evidence.ambiguous",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [],
+      "confidence": null
+    },
+    {
+      "caseId": "RDI-09",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "policy.denied"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": true,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.155399999999986,
+      "toolDurationMs": 10.390459,
+      "sandboxOverheadMs": 211.03884100000002,
+      "outcome": "denied",
+      "reasonCode": "policy.denied",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.read",
+          "status": "denied",
+          "error": "repo.path.denied"
+        }
+      ],
+      "confidence": null
+    },
+    {
+      "caseId": "RDI-10",
+      "taskSuccess": true,
+      "validPlanRate": 0,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0,
+      "criticRejectionReasons": [
+        "plan.invalid"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": true,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.0774,
+      "toolDurationMs": 0,
+      "sandboxOverheadMs": 0,
+      "outcome": "denied",
+      "reasonCode": "plan.invalid",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [],
+      "confidence": null
+    },
+    {
+      "caseId": "RDI-11",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 0.75,
+      "criticRejectionReasons": [
+        "policy.denied"
+      ],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": true,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.23460000000000036,
+      "toolDurationMs": 111.28470899999999,
+      "sandboxOverheadMs": 863.289391,
+      "outcome": "denied",
+      "reasonCode": "policy.denied",
+      "snapshotRemovedBeforeReplay": null,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.test",
+          "status": "denied",
+          "error": "repo.network.denied"
+        }
+      ],
+      "confidence": null
+    },
+    {
+      "caseId": "RDI-12",
+      "taskSuccess": true,
+      "validPlanRate": 1,
+      "evidenceGroundingPassed": true,
+      "executedStepSuccessRate": 1,
+      "criticRejectionReasons": [],
+      "recoveryAttempts": 0,
+      "recoverySucceeded": false,
+      "prohibitedActionRejected": null,
+      "replayEquivalent": true,
+      "plannerOverheadMs": 0.31739999999990687,
+      "toolDurationMs": 135.897542,
+      "sandboxOverheadMs": 837.6765580000001,
+      "outcome": "succeeded",
+      "reasonCode": "evidence.grounded",
+      "snapshotRemovedBeforeReplay": true,
+      "exactScore": 1,
+      "semanticScore": 1,
+      "scoreFailures": [],
+      "allowedActionsValid": true,
+      "stages": {
+        "planning": true,
+        "tool": true,
+        "evidence": true,
+        "recovery": true,
+        "replay": true
+      },
+      "toolCalls": [
+        {
+          "index": 1,
+          "toolId": "repo.search",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 2,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 3,
+          "toolId": "repo.read",
+          "status": "succeeded",
+          "error": null
+        },
+        {
+          "index": 4,
+          "toolId": "repo.test",
+          "status": "succeeded",
+          "error": null
+        }
+      ],
+      "confidence": 1
+    }
+  ],
+  "v1Successes": 10,
+  "v2Successes": 12,
+  "recoverableSuccessImprovement": 2,
+  "nonRecoveryRegressed": false,
+  "passed": true,
+  "snapshots": [
+    {
+      "schemaVersion": "0.1",
+      "snapshotId": "sha256:6c13d7a97ce3587b55e39073f7394316954ea94a79f8dad5e063e0de8670c9f9",
+      "contentHash": "6c13d7a97ce3587b55e39073f7394316954ea94a79f8dad5e063e0de8670c9f9",
+      "sourceRevision": "repository-diagnostics-fixture-v1",
+      "createdAtUtc": "2026-09-30T00:00:00+00:00"
+    },
+    {
+      "schemaVersion": "0.1",
+      "snapshotId": "sha256:ba6c6a7d43a9c3d029739228d7ff55cc78d1367e6e49f3cbca46f54dfd697eee",
+      "contentHash": "ba6c6a7d43a9c3d029739228d7ff55cc78d1367e6e49f3cbca46f54dfd697eee",
+      "sourceRevision": "repository-diagnostics-fixture-v2",
+      "createdAtUtc": "2026-10-24T00:00:00+00:00"
+    }
+  ],
+  "thresholds": {
+    "minCases": 12,
+    "minSuccesses": 10
+  },
+  "gateChecks": [
+    {
+      "name": "dataset-size",
+      "passed": true,
+      "detail": "12 cases, minimum 12"
+    },
+    {
+      "name": "task-success",
+      "passed": true,
+      "detail": "12 of 12 succeed, minimum 10"
+    },
+    {
+      "name": "allowed-action-validity",
+      "passed": true,
+      "detail": "12/12 cases used catalogue actions only"
+    },
+    {
+      "name": "prohibited-action-rejection",
+      "passed": true,
+      "detail": "3/3 prohibited cases rejected"
+    },
+    {
+      "name": "evidence-grounding",
+      "passed": true,
+      "detail": "12/12 cases grounded"
+    },
+    {
+      "name": "replay-equivalence",
+      "passed": true,
+      "detail": "24/24 runs replayed"
+    },
+    {
+      "name": "recovery-improvement",
+      "passed": true,
+      "detail": "improvement 2, non-recovery regression False"
+    },
+    {
+      "name": "confidence-calibration",
+      "passed": true,
+      "detail": "14 claims, 0 incorrect, accept\u003E=0.85, brier 0.0046, ece 0.05, reproducible True"
+    },
+    {
+      "name": "baseline-regressions",
+      "passed": true,
+      "detail": "none"
+    }
+  ],
+  "stageSummary": {
+    "plannerV1": {
+      "planning": {
+        "passed": 11,
+        "failed": 1,
+        "failedCases": [
+          "RDI-07"
+        ]
+      },
+      "tool": {
+        "passed": 11,
+        "failed": 1,
+        "failedCases": [
+          "RDI-06"
+        ]
+      },
+      "evidence": {
+        "passed": 12,
+        "failed": 0,
+        "failedCases": []
+      },
+      "recovery": {
+        "passed": 12,
+        "failed": 0,
+        "failedCases": []
+      },
+      "replay": {
+        "passed": 12,
+        "failed": 0,
+        "failedCases": []
+      }
+    },
+    "plannerV2": {
+      "planning": {
+        "passed": 12,
+        "failed": 0,
+        "failedCases": []
+      },
+      "tool": {
+        "passed": 12,
+        "failed": 0,
+        "failedCases": []
+      },
+      "evidence": {
+        "passed": 12,
+        "failed": 0,
+        "failedCases": []
+      },
+      "recovery": {
+        "passed": 12,
+        "failed": 0,
+        "failedCases": []
+      },
+      "replay": {
+        "passed": 12,
+        "failed": 0,
+        "failedCases": []
+      }
+    }
+  },
+  "regressions": [],
+  "calibration": {
+    "schemaVersion": "0.1",
+    "formula": "requirementCoverage * (0.6 \u002B 0.4 * termCoverage) * 0.85^(attempts-1) * (testConfirmed ? 1 : 0.95)",
+    "observationHash": "db174f7a687774445a2f76af6c0005d0ffc04f2debd060624af166e20bca9ad9",
+    "claims": 14,
+    "incorrectClaims": 0,
+    "brier": 0.0046,
+    "expectedCalibrationError": 0.05,
+    "bins": [
+      {
+        "lower": 0.8,
+        "upper": 0.9,
+        "count": 2,
+        "meanConfidence": 0.85,
+        "accuracy": 1
+      },
+      {
+        "lower": 0.9,
+        "upper": 1,
+        "count": 12,
+        "meanConfidence": 0.9667,
+        "accuracy": 1
+      }
+    ],
+    "thresholds": {
+      "accept": 0.85,
+      "abstainBelow": null
+    },
+    "observations": [
+      {
+        "runId": "v1:RDI-01",
+        "confidence": 1,
+        "correct": true
+      },
+      {
+        "runId": "v1:RDI-02",
+        "confidence": 0.95,
+        "correct": true
+      },
+      {
+        "runId": "v1:RDI-03",
+        "confidence": 0.95,
+        "correct": true
+      },
+      {
+        "runId": "v1:RDI-04",
+        "confidence": 0.95,
+        "correct": true
+      },
+      {
+        "runId": "v1:RDI-05",
+        "confidence": 0.95,
+        "correct": true
+      },
+      {
+        "runId": "v1:RDI-12",
+        "confidence": 1,
+        "correct": true
+      },
+      {
+        "runId": "v2:RDI-01",
+        "confidence": 1,
+        "correct": true
+      },
+      {
+        "runId": "v2:RDI-02",
+        "confidence": 0.95,
+        "correct": true
+      },
+      {
+        "runId": "v2:RDI-03",
+        "confidence": 0.95,
+        "correct": true
+      },
+      {
+        "runId": "v2:RDI-04",
+        "confidence": 0.95,
+        "correct": true
+      },
+      {
+        "runId": "v2:RDI-05",
+        "confidence": 0.95,
+        "correct": true
+      },
+      {
+        "runId": "v2:RDI-06",
+        "confidence": 0.85,
+        "correct": true
+      },
+      {
+        "runId": "v2:RDI-07",
+        "confidence": 0.85,
+        "correct": true
+      },
+      {
+        "runId": "v2:RDI-12",
+        "confidence": 1,
+        "correct": true
+      }
+    ],
+    "limits": [
+      "No incorrect claim in the dataset: thresholds are not validated against false accepts and brier/ece measure under-confidence only.",
+      "Small dataset (14 claims): thresholds are provisional."
+    ]
+  }
+}

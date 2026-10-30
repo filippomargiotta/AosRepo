@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-30",
+  "baselineCommit": "cf5b39b",
+  "implementationState": "uncommitted working-tree implementation (confidence calibration on top of cf5b39b)",
+  "sourceTreeSha256": "cecd83937d946d2ebe42a3ee7a267accee45675f5cb89aa3dd87412ccb407505",
+  "hostArchitecture": "ARM64",
+  "dotnetSdk": "10.0.403",
+  "containerRuntime": "OrbStack OCI/runc",
+  "dockerVersion": "29.8.2",
+  "workerImage": "aos-sandbox-worker:local",
+  "workerImageId": "sha256:afd74ee197e3ff46c4681595eedf5b64defe07ddce774d91eb6f56f98ae8ae2f",
+  "releaseSuite": { "passed": 177, "failed": 0, "skipped": 8 },
+  "containerReleaseSuite": { "passed": 187, "failed": 0, "skipped": 0 },
+  "goldenEvaluation": { "passed": 19, "failed": 0 },
+  "diagnosticsGate": {
+    "passed": true,
+    "cases": 12,
+    "plannerV1Successes": 10,
+    "plannerV2Successes": 12,
+    "recoverableImprovement": 2,
+    "baselineReport": "project/evidence/2026-09/container/report.json",
+    "baselineRegressions": 0
+  },
+  "confidenceCalibration": {
+    "claims": 14,
+    "incorrectClaims": 0,
+    "acceptThreshold": 0.85,
+    "brier": 0.0046,
+    "expectedCalibrationError": 0.05,
+    "reproducible": true,
+    "limit": "No incorrect claim in the dataset; thresholds are not validated against false accepts."
+  },
+  "offlineReplay": {
+    "passed": 24,
+    "failed": 0,
+    "network": "none",
+    "readOnlyRoot": true,
+    "snapshotAvailable": false,
+    "sandboxWorkerAvailable": false,
+    "dockerSocketAvailable": false,
+    "preparationScript": "scripts/stage-replay-only.py"
+  },
+  "leftoverSandboxContainers": 0
+}

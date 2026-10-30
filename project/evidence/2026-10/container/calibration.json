@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "0.1",
+  "formula": "requirementCoverage * (0.6 \u002B 0.4 * termCoverage) * 0.85^(attempts-1) * (testConfirmed ? 1 : 0.95)",
+  "observationHash": "db174f7a687774445a2f76af6c0005d0ffc04f2debd060624af166e20bca9ad9",
+  "claims": 14,
+  "incorrectClaims": 0,
+  "brier": 0.0046,
+  "expectedCalibrationError": 0.05,
+  "bins": [
+    {
+      "lower": 0.8,
+      "upper": 0.9,
+      "count": 2,
+      "meanConfidence": 0.85,
+      "accuracy": 1
+    },
+    {
+      "lower": 0.9,
+      "upper": 1,
+      "count": 12,
+      "meanConfidence": 0.9667,
+      "accuracy": 1
+    }
+  ],
+  "thresholds": {
+    "accept": 0.85,
+    "abstainBelow": null
+  },
+  "observations": [
+    {
+      "runId": "v1:RDI-01",
+      "confidence": 1,
+      "correct": true
+    },
+    {
+      "runId": "v1:RDI-02",
+      "confidence": 0.95,
+      "correct": true
+    },
+    {
+      "runId": "v1:RDI-03",
+      "confidence": 0.95,
+      "correct": true
+    },
+    {
+      "runId": "v1:RDI-04",
+      "confidence": 0.95,
+      "correct": true
+    },
+    {
+      "runId": "v1:RDI-05",
+      "confidence": 0.95,
+      "correct": true
+    },
+    {
+      "runId": "v1:RDI-12",
+      "confidence": 1,
+      "correct": true
+    },
+    {
+      "runId": "v2:RDI-01",
+      "confidence": 1,
+      "correct": true
+    },
+    {
+      "runId": "v2:RDI-02",
+      "confidence": 0.95,
+      "correct": true
+    },
+    {
+      "runId": "v2:RDI-03",
+      "confidence": 0.95,
+      "correct": true
+    },
+    {
+      "runId": "v2:RDI-04",
+      "confidence": 0.95,
+      "correct": true
+    },
+    {
+      "runId": "v2:RDI-05",
+      "confidence": 0.95,
+      "correct": true
+    },
+    {
+      "runId": "v2:RDI-06",
+      "confidence": 0.85,
+      "correct": true
+    },
+    {
+      "runId": "v2:RDI-07",
+      "confidence": 0.85,
+      "correct": true
+    },
+    {
+      "runId": "v2:RDI-12",
+      "confidence": 1,
+      "correct": true
+    }
+  ],
+  "limits": [
+    "No incorrect claim in the dataset: thresholds are not validated against false accepts and brier/ece measure under-confidence only.",
+    "Small dataset (14 claims): thresholds are provisional."
+  ]
+}

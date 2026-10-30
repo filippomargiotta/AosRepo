@@ -133,4 +133,65 @@ public sealed class DiagnosticsScoringTests
         var failedBefore = baseline with { PlannerV2 = [worse] };
         Assert.Empty(DiagnosticsEvaluationRunner.CompareToBaseline(failedBefore, [worse]));
     }
+
+    private static double ConfidenceOf(string id, int attempts = 1)
+    {
+        var scenario = Case(id);
+        var artifacts = RepositoryDiagnosticsTests.Run(scenario);
+        var plan = RepositoryDiagnosticsTests.Events<DiagnosticsPlanEvent>(artifacts, "diagnostics.plan").Last(p => p.IsValid);
+        return DiagnosticsConfidence.Compute(artifacts.Outcome with { Attempts = attempts }, plan);
+    }
+
+    [Fact]
+    public void Confidence_IsDeterministicBoundedAndPenalisesRecovery()
+    {
+        var first = ConfidenceOf("RDI-01");
+        Assert.Equal(first, ConfidenceOf("RDI-01"));
+        Assert.InRange(first, 0.5, 1);
+        Assert.True(ConfidenceOf("RDI-01", attempts: 2) < first);
+    }
+
+    [Fact]
+    public void Confidence_IsZeroWithoutADiagnosisClaim()
+    {
+        var scenario = Case("RDI-08");
+        var artifacts = RepositoryDiagnosticsTests.Run(scenario);
+        var plan = RepositoryDiagnosticsTests.Events<DiagnosticsPlanEvent>(artifacts, "diagnostics.plan").Last();
+        Assert.Equal(0, DiagnosticsConfidence.Compute(artifacts.Outcome, plan));
+    }
+
+    [Fact]
+    public void Calibration_IsOrderIndependentAndReproducible()
+    {
+        ConfidenceObservation[] data =
+        [
+            new("a", 0.95, true), new("b", 0.9, true), new("c", 0.85, true), new("d", 0.7, false), new("e", 0.6, false), new("f", 0.88, true)
+        ];
+        var forward = DiagnosticsConfidence.Calibrate(data);
+        var reversed = DiagnosticsConfidence.Calibrate(data.Reverse());
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(forward), System.Text.Json.JsonSerializer.Serialize(reversed));
+        Assert.Equal(0.85, forward.Thresholds.Accept);
+        Assert.Equal(0.7, forward.Thresholds.AbstainBelow);
+        Assert.Equal("confident", DiagnosticsConfidence.Classify(0.9, forward.Thresholds));
+        Assert.Equal("abstain", DiagnosticsConfidence.Classify(0.65, forward.Thresholds));
+        Assert.Equal("low-confidence", DiagnosticsConfidence.Classify(0.8, forward.Thresholds));
+        Assert.Empty(DiagnosticsConfidence.Verify(forward.Thresholds, data));
+    }
+
+    [Fact]
+    public void Calibration_RejectsStoredThresholdsThatWouldAcceptAWrongClaim()
+    {
+        ConfidenceObservation[] data = [new("a", 0.95, true), new("b", 0.9, false), new("c", 0.92, true)];
+        Assert.Single(DiagnosticsConfidence.Verify(new ConfidenceThresholds(0.85, null), data));
+        Assert.Empty(DiagnosticsConfidence.Verify(new ConfidenceThresholds(0.93, null), data));
+    }
+
+    [Fact]
+    public void Calibration_ReportsItsLimitsWhenEveryClaimIsCorrect()
+    {
+        var calibration = DiagnosticsConfidence.Calibrate([new("a", 0.9, true), new("b", 0.95, true), new("c", 1, true)]);
+        Assert.Contains(calibration.Limits, l => l.StartsWith("No incorrect claim", StringComparison.Ordinal));
+        Assert.Equal(0.9, calibration.Thresholds.Accept);
+        Assert.Null(calibration.Thresholds.AbstainBelow);
+    }
 }

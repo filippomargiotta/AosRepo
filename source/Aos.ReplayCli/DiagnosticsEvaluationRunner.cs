@@ -102,6 +102,16 @@ public static class DiagnosticsEvaluationRunner
             var regressions = options.TryGetValue("--baseline", out var baselinePath)
                 ? CompareToBaseline(JsonSerializer.Deserialize<DiagnosticsEvaluationReport>(File.ReadAllText(baselinePath), RepositoryToolExecutor.JsonOptions)
                     ?? throw new ArgumentException("Invalid baseline report."), v2) : [];
+            // Every diagnosis claim (a succeeded outcome) is one observation; correctness is the case's scorer verdict.
+            var observations = v1.Select(m => ("v1", m)).Concat(v2.Select(m => ("v2", m))).Where(x => x.m.Confidence is not null)
+                .Select(x => new ConfidenceObservation($"{x.Item1}:{x.m.CaseId}", x.m.Confidence!.Value, x.m.TaskSuccess)).ToArray();
+            var calibration = DiagnosticsConfidence.Calibrate(observations);
+            var storedThresholds = options.TryGetValue("--calibration", out var calibrationPath)
+                ? (JsonSerializer.Deserialize<ConfidenceCalibration>(File.ReadAllText(calibrationPath), RepositoryToolExecutor.JsonOptions)
+                    ?? throw new ArgumentException("Invalid calibration file.")).Thresholds : calibration.Thresholds;
+            var confidenceFailures = DiagnosticsConfidence.Verify(storedThresholds, observations);
+            var recomputed = DiagnosticsConfidence.Calibrate(observations.Reverse());
+            var reproducible = JsonSerializer.Serialize(recomputed) == JsonSerializer.Serialize(calibration);
             var checks = new List<DiagnosticsGateCheck>
             {
                 new("dataset-size", cases.Length >= minCases, $"{cases.Length} cases, minimum {minCases}"),
@@ -111,13 +121,18 @@ public static class DiagnosticsEvaluationRunner
                 new("evidence-grounding", v2.All(m => m.EvidenceGroundingPassed), $"{v2.Count(m => m.EvidenceGroundingPassed)}/{v2.Count} cases grounded"),
                 new("replay-equivalence", v1.Concat(v2).All(m => m.ReplayEquivalent && m.SnapshotRemovedBeforeReplay != false), $"{v1.Concat(v2).Count(m => m.ReplayEquivalent)}/{v1.Count + v2.Count} runs replayed"),
                 new("recovery-improvement", improvement > 0 && !regression, $"improvement {improvement}, non-recovery regression {regression}"),
+                new("confidence-calibration", reproducible && confidenceFailures.Count == 0 && storedThresholds.Accept is not null,
+                    $"{calibration.Claims} claims, {calibration.IncorrectClaims} incorrect, accept>={storedThresholds.Accept?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? "none"}, " +
+                    $"brier {calibration.Brier:0.####}, ece {calibration.ExpectedCalibrationError:0.####}, reproducible {reproducible}" +
+                    (confidenceFailures.Count == 0 ? "" : "; " + string.Join("; ", confidenceFailures))),
                 new("baseline-regressions", regressions.Count == 0, regressions.Count == 0 ? "none" : string.Join("; ", regressions))
             };
             var passed = checks.All(c => c.Passed);
             var report = new DiagnosticsEvaluationReport(DiagnosticsSchema.Version, executor, snapshot.Reference, v1, v2,
                 v1.Count(m => m.TaskSuccess), v2.Count(m => m.TaskSuccess), improvement, regression, passed,
-                snapshotDirs.Values.Select(d => d.Snapshot.Reference).ToArray(), new(minCases, minSuccesses), checks, new(Summarize(v1), Summarize(v2)), regressions);
+                snapshotDirs.Values.Select(d => d.Snapshot.Reference).ToArray(), new(minCases, minSuccesses), checks, new(Summarize(v1), Summarize(v2)), regressions, calibration);
             await File.WriteAllTextAsync(Path.Combine(outputRoot, "report.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions(RepositoryToolExecutor.JsonOptions) { WriteIndented = true }) + "\n", cancellationToken);
+            await File.WriteAllTextAsync(Path.Combine(outputRoot, "calibration.json"), JsonSerializer.Serialize(calibration, new JsonSerializerOptions(RepositoryToolExecutor.JsonOptions) { WriteIndented = true }) + "\n", cancellationToken);
             foreach (var check in checks) await stdout.WriteLineAsync($"  {(check.Passed ? "PASS" : "FAIL")} {check.Name}: {check.Detail}");
             await stdout.WriteLineAsync($"Diagnostics gate: {(passed ? "PASS" : "FAIL")}; v1={report.V1Successes}/{cases.Length}, v2={report.V2Successes}/{cases.Length}; recoverable improvement={improvement}; non-recovery regression={regression}.");
             return passed ? 0 : 1;
@@ -150,6 +165,8 @@ public static class DiagnosticsEvaluationRunner
             plans.Where(p => p.Plan is not null).All(p => p.Plan!.Steps.All(step => catalogue.Contains(step.ActionId)));
         var finalTools = FinalAttemptTools(artifacts);
         var stages = Stages(expected, outcome, plans, finalTools, score, grounding, replay, snapshotRemovedBeforeReplay, v2);
+        var finalPlan = plans.LastOrDefault(p => p.IsValid);
+        double? confidence = outcome.Status == "succeeded" && finalPlan is not null ? DiagnosticsConfidence.Compute(outcome, finalPlan) : null;
         return new(expected.CaseId, score.Passed,
             plans.Count == 0 ? 0 : (double)plans.Count(p => p.IsValid) / plans.Count, grounding,
             tools.Count == 0 ? 0 : (double)tools.Count(t => t.Status == "succeeded") / tools.Count,
@@ -158,7 +175,7 @@ public static class DiagnosticsEvaluationRunner
             prohibited, replay, artifacts.Timing?.PlannerOverheadMs ?? 0, artifacts.Timing?.ToolDurationMs ?? 0,
             artifacts.Timing?.SandboxOverheadMs ?? 0, outcome.Status, outcome.ReasonCode, snapshotRemovedBeforeReplay,
             score.ExactScore, score.SemanticScore, score.Failures, actionsValid, stages,
-            tools.Select((t, index) => new DiagnosticsToolCallRow(index + 1, t.ToolId, t.Status, t.Error)).ToArray());
+            tools.Select((t, index) => new DiagnosticsToolCallRow(index + 1, t.ToolId, t.Status, t.Error)).ToArray(), confidence);
     }
 
     // Tool events recorded after the last plan event belong to the final attempt.
@@ -239,11 +256,11 @@ public static class DiagnosticsEvaluationRunner
             JsonSerializer.SerializeToElement(r.Entry.Data, RepositoryToolExecutor.JsonOptions).Deserialize<T>(RepositoryToolExecutor.JsonOptions)!).ToArray();
     private static Dictionary<string, string> Parse(string[] args)
     {
-        var known = new[] { "--snapshot-dir", "--cases-root", "--output-dir", "--hmac-key", "--executor", "--worker-assembly", "--container-image", "--snapshot-dir-v2", "--baseline", "--min-cases", "--min-successes" };
+        var known = new[] { "--snapshot-dir", "--cases-root", "--output-dir", "--hmac-key", "--executor", "--worker-assembly", "--container-image", "--snapshot-dir-v2", "--baseline", "--min-cases", "--min-successes", "--calibration" };
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var index = 0; index < args.Length; index += 2)
             if (index + 1 >= args.Length || !known.Contains(args[index]) || !result.TryAdd(args[index], args[index + 1]))
-                throw new ArgumentException("Usage: evaluate-diagnostics --snapshot-dir <dir> --cases-root <dir> --output-dir <dir> --hmac-key <key> [--executor container-v1|process-v1] [--worker-assembly <dll>] [--snapshot-dir-v2 <dir>] [--baseline <report.json>] [--min-cases <n>] [--min-successes <n>]");
+                throw new ArgumentException("Usage: evaluate-diagnostics --snapshot-dir <dir> --cases-root <dir> --output-dir <dir> --hmac-key <key> [--executor container-v1|process-v1] [--worker-assembly <dll>] [--snapshot-dir-v2 <dir>] [--baseline <report.json>] [--min-cases <n>] [--min-successes <n>] [--calibration <calibration.json>]");
         foreach (var key in known.Take(4)) if (!result.ContainsKey(key)) throw new ArgumentException($"Missing {key}.");
         return result;
     }

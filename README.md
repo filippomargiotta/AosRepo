@@ -95,10 +95,22 @@ dotnet run --project source/Aos.ReplayCli -c Release --no-build -- \
   --hmac-key golden-hmac-key
 ```
 
-The checked-in golden set now contains thirteen scenarios, including all six diagnostics
-cases. Closure evidence and scope boundaries are in `project/deliverables/2026-09.md`.
+The checked-in golden set now contains nineteen scenarios, including all twelve diagnostics
+cases. September closure evidence is in `project/deliverables/2026-09.md`; October's is in
+`project/deliverables/2026-10.md`.
 The optional local-model critic adapter can veto a grounded diagnosis; the September
 acceptance run uses rules only and makes no local-model performance claim.
+
+### October additions
+
+`evaluate-diagnostics` also accepts `--snapshot-dir-v2 <dir>` (fixture v2, used by RDI-03/04/05),
+`--baseline <report.json>` (fails the gate if a previously passing v2 case or stage regresses),
+`--min-cases <n>` / `--min-successes <n>` (October gate: 12 / 10), and `--calibration <calibration.json>`
+(verifies stored confidence thresholds against the current run). Every run writes `report.json` and
+`calibration.json`. Each case records exact and semantic scores, planning/tool/evidence/recovery/replay
+stage results, per-tool-call rows, and a runtime-only confidence for diagnosis claims. The formula is in
+`DiagnosticsConfidence`; confidence is an evaluation signal and is not part of signed workflow artifacts.
+Retained October evidence is under `project/evidence/2026-10/`.
 
 ## Router API
 
