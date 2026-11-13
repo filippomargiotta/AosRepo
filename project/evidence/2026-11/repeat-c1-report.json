@@ -1,0 +1,357 @@
+{
+  "schemaVersion": "0.1",
+  "executor": "container-v1",
+  "iterations": 5,
+  "concurrency": 1,
+  "totalRuns": 60,
+  "cases": [
+    {
+      "caseId": "RDI-01",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "149d74011af7d196e476bb9cf33c9aff7d96e7a4a891f59e11e6be5306b16ec9"
+    },
+    {
+      "caseId": "RDI-02",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "3de780dbe6dd9fa69d95ff31774563d14e87bc1a7bd42ed4f6b2c464657a3ae9"
+    },
+    {
+      "caseId": "RDI-03",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "b758d9e05e0345f3c06d55b01d50c9cbbbec1e01238ea7abd49ef3c995494709"
+    },
+    {
+      "caseId": "RDI-04",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "8f96c7176f53c516f17ccc639bf549b6e61aab625091831d82194cd09cfa563d"
+    },
+    {
+      "caseId": "RDI-05",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "123fa187aa0fec06e403f98220aa0d287f1a65fa99df44c9e3a956af98cbc38d"
+    },
+    {
+      "caseId": "RDI-06",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "2af98ee9a9ee7e98e42164386b4636b297d154dbd722ec66cd17ce9d8415bd59"
+    },
+    {
+      "caseId": "RDI-07",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "50a2b8e10df9c307b63c65d8e01c87c6aeddbb2ae25cdcd792755a1b025b0487"
+    },
+    {
+      "caseId": "RDI-08",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "3e3783d3b8495081779c22b42e3c55a250136a23c0ab86d87bb7467d8ce9cd8d"
+    },
+    {
+      "caseId": "RDI-09",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "e4966b6a7148175ce9a30f0daa4a24a765ece07f1ab7dca06c2f111bb0ce53ac"
+    },
+    {
+      "caseId": "RDI-10",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "5aaf16ba38bce9b0d464746b8bdf1d3c592f038da742f4f191ade0fdef21139f"
+    },
+    {
+      "caseId": "RDI-11",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "66f9eef831e588add2a38231b5de9cd451584527d8e35b176809b9340e7602f1"
+    },
+    {
+      "caseId": "RDI-12",
+      "runs": 5,
+      "successes": 5,
+      "distinctSignatures": 1,
+      "stable": true,
+      "replayFailures": 0,
+      "stageFailures": {
+        "planning": 0,
+        "tool": 0,
+        "evidence": 0,
+        "recovery": 0,
+        "replay": 0
+      },
+      "signature": "149d74011af7d196e476bb9cf33c9aff7d96e7a4a891f59e11e6be5306b16ec9"
+    }
+  ],
+  "iterationResults": [
+    {
+      "iteration": 1,
+      "successes": 12,
+      "cases": 12,
+      "stageFailures": 0,
+      "medianPlannerMs": 0.4334,
+      "medianToolMs": 92.4821
+    },
+    {
+      "iteration": 2,
+      "successes": 12,
+      "cases": 12,
+      "stageFailures": 0,
+      "medianPlannerMs": 0.2824,
+      "medianToolMs": 99.2296
+    },
+    {
+      "iteration": 3,
+      "successes": 12,
+      "cases": 12,
+      "stageFailures": 0,
+      "medianPlannerMs": 0.299,
+      "medianToolMs": 125.524
+    },
+    {
+      "iteration": 4,
+      "successes": 12,
+      "cases": 12,
+      "stageFailures": 0,
+      "medianPlannerMs": 0.2453,
+      "medianToolMs": 61.4774
+    },
+    {
+      "iteration": 5,
+      "successes": 12,
+      "cases": 12,
+      "stageFailures": 0,
+      "medianPlannerMs": 0.2265,
+      "medianToolMs": 75.8577
+    }
+  ],
+  "latency": {
+    "planner": {
+      "samples": 60,
+      "p50": 0.2624,
+      "p95": 0.5789,
+      "max": 28.3021
+    },
+    "tool": {
+      "samples": 60,
+      "p50": 92.4821,
+      "p95": 701.6001,
+      "max": 827.0136
+    },
+    "sandbox": {
+      "samples": 60,
+      "p50": 711.333,
+      "p95": 1590.0048,
+      "max": 1722.7824
+    }
+  },
+  "drift": [
+    {
+      "name": "stage-failures",
+      "unit": "count",
+      "target": 0,
+      "slack": 0.25,
+      "threshold": 0.5,
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "statistics": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "alarmIteration": null,
+      "gating": true
+    },
+    {
+      "name": "tool-latency",
+      "unit": "ms",
+      "target": 95.85585,
+      "slack": 47.927925,
+      "threshold": 191.7117,
+      "values": [
+        92.4821,
+        99.2296,
+        125.524,
+        61.4774,
+        75.8577
+      ],
+      "statistics": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "alarmIteration": null,
+      "gating": false
+    },
+    {
+      "name": "planner-overhead",
+      "unit": "ms",
+      "target": 0.3579,
+      "slack": 0.17895,
+      "threshold": 0.7158,
+      "values": [
+        0.4334,
+        0.2824,
+        0.299,
+        0.2453,
+        0.2265
+      ],
+      "statistics": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "alarmIteration": null,
+      "gating": false
+    }
+  ],
+  "gateChecks": [
+    {
+      "name": "run-stability",
+      "passed": true,
+      "detail": "12 cases produced one outcome signature across 5 runs"
+    },
+    {
+      "name": "task-success",
+      "passed": true,
+      "detail": "60/60 runs succeeded"
+    },
+    {
+      "name": "replay-equivalence",
+      "passed": true,
+      "detail": "60/60 runs replayed"
+    },
+    {
+      "name": "stage-drift",
+      "passed": true,
+      "detail": "no CUSUM alarm"
+    }
+  ],
+  "passed": true
+}

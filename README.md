@@ -72,7 +72,7 @@ counts as task success for the two prohibited-action cases. `report.json` includ
 per-case grounding, plan/step validity, rejection reasons, recovery, replay, and timing.
 Planner overhead, tool duration, and sandbox startup/cleanup are reported separately.
 
-`--executor process-v1 --worker-assembly source/Aos.SandboxWorker/bin/Release/net10.0/Aos.SandboxWorker.dll`
+`--executor process-v1 --worker-assembly source/Aos.SandboxWorker/bin/Release/net11.0/Aos.SandboxWorker.dll`
 is available for trusted-fixture protocol regression runs; container mode supplies the
 isolation evidence. Test profiles execute the packaged pricing assertion without build,
 dependency restore, or snapshot writes. The broad profile deliberately waits past its
@@ -111,6 +111,23 @@ acceptance run uses rules only and makes no local-model performance claim.
 stage results, per-tool-call rows, and a runtime-only confidence for diagnosis claims. The formula is in
 `DiagnosticsConfidence`; confidence is an evaluation signal and is not part of signed workflow artifacts.
 Retained October evidence is under `project/evidence/2026-10/`.
+
+## November additions
+
+`repeat-diagnostics` reruns the pinned Planner v2 dataset repeatedly and concurrently (same snapshot/case options as
+`evaluate-diagnostics`, plus `--runs <n>`, `--concurrency <n>`, `--baseline-runs <n>`, `--latency-slack <fraction>`,
+`--latency-threshold <fraction>`). Every run is replayed from its own signed artifacts. `repeat-report.json` records per-case outcome-signature
+stability, stage failures, planner/tool/sandbox latency summaries, and CUSUM drift series. The gate fails on an unstable or failing case,
+a replay failure, or a stage-failure CUSUM alarm; latency drift is informational. Retained evidence is under `project/evidence/2026-11/`.
+
+```bash
+dotnet run --project source/Aos.ReplayCli -c Release --no-build -- repeat-diagnostics \
+  --snapshot-dir source/Aos.RepositoryFixture/Repository --snapshot-dir-v2 source/Aos.RepositoryFixture/RepositoryV2 \
+  --cases-root source/Aos.WebApi.Tests/DiagnosticsCases --output-dir /tmp/aos-november-repeat \
+  --hmac-key golden-hmac-key --executor container-v1 --runs 5 --concurrency 4
+```
+
+The solution targets .NET 11 (SDK `11.0.100`); see `project/DependencyPolicy.md`.
 
 ## Router API
 

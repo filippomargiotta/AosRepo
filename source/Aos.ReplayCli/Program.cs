@@ -3,6 +3,9 @@ using Aos.ReplayCli;
 if (args.Length > 0 && string.Equals(args[0], "evaluate-diagnostics", StringComparison.OrdinalIgnoreCase))
     return await DiagnosticsEvaluationRunner.RunAsync(args[1..], Console.Out, Console.Error, CancellationToken.None);
 
+if (args.Length > 0 && string.Equals(args[0], "repeat-diagnostics", StringComparison.OrdinalIgnoreCase))
+    return await DiagnosticsRepeatRunner.RunAsync(args[1..], Console.Out, Console.Error, CancellationToken.None);
+
 if (args.Length > 0 && string.Equals(args[0], "evaluate", StringComparison.OrdinalIgnoreCase))
 {
     return await GoldenEvaluationRunner.RunAsync(args[1..], Console.Out, Console.Error, CancellationToken.None);

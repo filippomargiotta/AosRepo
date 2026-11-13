@@ -26,19 +26,7 @@ public static class DiagnosticsEvaluationRunner
             var minSuccesses = options.TryGetValue("--min-successes", out var minSuccessText) ? int.Parse(minSuccessText, System.Globalization.CultureInfo.InvariantCulture) : 10;
             var executor = options.GetValueOrDefault("--executor", "container-v1");
             if (executor is not ("container-v1" or "process-v1")) throw new ArgumentException("Executor must be container-v1 or process-v1.");
-            var cases = Directory.EnumerateFiles(options["--cases-root"], "*.json").Order(StringComparer.Ordinal)
-                .Select(file => JsonSerializer.Deserialize<DiagnosticsEvaluationCase>(File.ReadAllText(file), RepositoryToolExecutor.JsonOptions)
-                    ?? throw new ArgumentException("Invalid case file.")).ToArray();
-            if (cases.Length == 0 || cases.Select(c => c.CaseId).Distinct().Count() != cases.Length)
-                throw new ArgumentException("Dataset must contain unique versioned cases.");
-            foreach (var scenario in cases)
-            {
-                if (string.IsNullOrWhiteSpace(scenario.CaseId) || scenario.CaseId.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-'))
-                    throw new ArgumentException("Case ids must contain only ASCII letters, digits, and hyphens.");
-                if (!snapshotDirs.TryGetValue(scenario.Request.Snapshot.ContentHash, out var pinned))
-                    throw new ArgumentException($"{scenario.CaseId} pins a snapshot with no matching --snapshot-dir.");
-                pinned.Snapshot.Verify(scenario.Request.Snapshot);
-            }
+            var cases = LoadCases(options["--cases-root"], snapshotDirs);
             var outputRoot = Path.GetFullPath(options["--output-dir"]);
             Directory.CreateDirectory(outputRoot);
             var v1 = new List<DiagnosticsCaseMetrics>();
@@ -49,51 +37,13 @@ public static class DiagnosticsEvaluationRunner
                 foreach (var scenario in cases)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    // RDI-12 runs from a disposable copy that is deleted before replay, proving replay needs no snapshot.
-                    var caseDir = snapshotDirs[scenario.Request.Snapshot.ContentHash].Dir;
-                    var staged = scenario.ReplayWithoutSnapshot
-                        ? StageSnapshot(caseDir, Path.Combine(outputRoot, ".staged-snapshots", $"{scenario.CaseId}-v{retries + 1}"), scenario.Request.Snapshot)
-                        : null;
-                    var config = new SandboxPoolOptions { PoolSize = 0, ExecutorType = executor,
-                        RepositorySnapshotDirectory = staged ?? Path.GetFullPath(caseDir),
-                        ContainerImage = options.GetValueOrDefault("--container-image", "aos-sandbox-worker:local") };
-                    Func<ISandboxSlot> factory = executor == "container-v1" ? SandboxSlotFactory.Create(config) :
-                        () => new ProcessSandboxSlot(options.GetValueOrDefault("--worker-assembly"), environmentVariables:
-                            new Dictionary<string, string> { ["AOS_REPOSITORY_SNAPSHOT_ROOT"] = config.RepositorySnapshotDirectory! });
-                    using var pool = new PreWarmedSandboxPool(0, factory);
-                    var capability = new HmacJwtCapabilityTokenService(Options.Create(new CapabilityTokenOptions
-                    {
-                        Issuer = "diagnostics-evaluation", Audience = "diagnostics-tools",
-                        SigningKey = "evaluation-capability-key-local-32-bytes", KeyId = "evaluation-capability"
-                    }));
-                    var catalog = RepositoryDiagnosticsDefaults.Catalog();
-                    var clock = new SystemTimeSource();
-                    var service = new DiagnosticsWorkflowService(RepositoryDiagnosticsDefaults.Planner(catalog), RepositoryDiagnosticsDefaults.Policies(),
-                        catalog, new PlannerStepExecutor(catalog, capability,
-                            new CapabilityEnforcingToolExecutor(capability, new PooledSandboxToolExecutor(pool, Options.Create(config))), clock),
-                        new RuleBasedDiagnosticsDecisions(), RepositoryDiagnosticsDefaults.Recovery(retries), new LockedSeedProvider(new RandomSeedGenerator()),
-                        clock, new DiagnosticsRuleRouter(), new HmacEventLogIntegrityChain(key, "diagnostics-evaluation"), new HmacManifestSigner(key, "diagnostics-evaluation"));
-                    var artifacts = service.CreateArtifacts($"{scenario.CaseId}-v{retries + 1}-{Guid.NewGuid():N}", scenario.Request, cancellationToken);
-                    bool? snapshotRemoved = null;
-                    if (staged is not null)
-                    {
-                        pool.Dispose();
-                        Directory.Delete(staged, recursive: true);
-                        snapshotRemoved = !Directory.Exists(staged);
-                    }
-                    var dir = Path.Combine(outputRoot, $"planner-v{retries + 1}", scenario.CaseId);
-                    Directory.CreateDirectory(dir);
-                    await File.WriteAllTextAsync(Path.Combine(dir, "manifest.json"), JsonSerializer.Serialize(artifacts.ManifestRecord, RepositoryToolExecutor.JsonOptions) + "\n", cancellationToken);
-                    await File.WriteAllTextAsync(Path.Combine(dir, "eventlog.jsonl"), string.Concat(artifacts.EventLogRecords.Select(r => JsonSerializer.Serialize(r, RepositoryToolExecutor.JsonOptions) + "\n")), cancellationToken);
-                    await File.WriteAllTextAsync(Path.Combine(dir, "scenario.json"), JsonSerializer.Serialize(new
-                    { name = $"{scenario.CaseId}-planner-v{retries + 1}", workflow = "diagnostics", manifestPath = "manifest.json", eventLogPath = "eventlog.jsonl" }, RepositoryToolExecutor.JsonOptions), cancellationToken);
-                    using var replayOut = new StringWriter();
-                    using var replayError = new StringWriter();
-                    var replay = await ReplayCliRunner.RunAsync(["--workflow", "diagnostics", "--artifact-dir", dir, "--hmac-key", key], replayOut, replayError, cancellationToken) == 0;
+                    var (artifacts, snapshotRemoved) = ExecuteCase(scenario, snapshotDirs[scenario.Request.Snapshot.ContentHash].Dir, retries, executor, options,
+                        key, Path.Combine(outputRoot, ".staged-snapshots", $"{scenario.CaseId}-v{retries + 1}"), $"{scenario.CaseId}-v{retries + 1}-{Guid.NewGuid():N}", cancellationToken);
+                    var replay = await WriteAndReplayAsync(artifacts, $"{scenario.CaseId}-planner-v{retries + 1}",
+                        Path.Combine(outputRoot, $"planner-v{retries + 1}", scenario.CaseId), key, stderr, cancellationToken);
                     var metrics = Measure(scenario, artifacts, replay, retries == 1, snapshotRemoved);
                     (retries == 0 ? v1 : v2).Add(metrics);
                     await stdout.WriteLineAsync($"Planner v{retries + 1} {scenario.CaseId}: {(metrics.TaskSuccess ? "PASS" : "FAIL")} {metrics.Outcome} ({metrics.ReasonCode}), replay={(replay ? "PASS" : "FAIL")}");
-                    if (!replay) await stderr.WriteLineAsync(replayError.ToString());
                 }
             }
             var improvement = cases.Where(c => c.Recoverable).Sum(c =>
@@ -142,6 +92,78 @@ public static class DiagnosticsEvaluationRunner
             await stderr.WriteLineAsync(ex.Message);
             return 2;
         }
+    }
+
+
+    internal static DiagnosticsEvaluationCase[] LoadCases(string casesRoot,
+        IReadOnlyDictionary<string, (string Dir, RepositorySnapshot Snapshot)> snapshotDirs)
+    {
+        var cases = Directory.EnumerateFiles(casesRoot, "*.json").Order(StringComparer.Ordinal)
+            .Select(file => JsonSerializer.Deserialize<DiagnosticsEvaluationCase>(File.ReadAllText(file), RepositoryToolExecutor.JsonOptions)
+                ?? throw new ArgumentException("Invalid case file.")).ToArray();
+        if (cases.Length == 0 || cases.Select(c => c.CaseId).Distinct().Count() != cases.Length)
+            throw new ArgumentException("Dataset must contain unique versioned cases.");
+        foreach (var scenario in cases)
+        {
+            if (string.IsNullOrWhiteSpace(scenario.CaseId) || scenario.CaseId.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-'))
+                throw new ArgumentException("Case ids must contain only ASCII letters, digits, and hyphens.");
+            if (!snapshotDirs.TryGetValue(scenario.Request.Snapshot.ContentHash, out var pinned))
+                throw new ArgumentException($"{scenario.CaseId} pins a snapshot with no matching --snapshot-dir.");
+            pinned.Snapshot.Verify(scenario.Request.Snapshot);
+        }
+        return cases;
+    }
+
+    // Runs one case on a fresh pool and workflow service. Safe to call concurrently when stagingDir and runId are unique.
+    internal static (DiagnosticsWorkflowArtifacts Artifacts, bool? SnapshotRemoved) ExecuteCase(
+        DiagnosticsEvaluationCase scenario, string caseDir, int retries, string executor, IReadOnlyDictionary<string, string> options,
+        string key, string stagingDir, string runId, CancellationToken cancellationToken)
+    {
+        // RDI-12 runs from a disposable copy that is deleted before replay, proving replay needs no snapshot.
+        var staged = scenario.ReplayWithoutSnapshot ? StageSnapshot(caseDir, stagingDir, scenario.Request.Snapshot) : null;
+        var config = new SandboxPoolOptions { PoolSize = 0, ExecutorType = executor,
+            RepositorySnapshotDirectory = staged ?? Path.GetFullPath(caseDir),
+            ContainerImage = options.GetValueOrDefault("--container-image", "aos-sandbox-worker:local") };
+        Func<ISandboxSlot> factory = executor == "container-v1" ? SandboxSlotFactory.Create(config) :
+            () => new ProcessSandboxSlot(options.GetValueOrDefault("--worker-assembly"), environmentVariables:
+                new Dictionary<string, string> { ["AOS_REPOSITORY_SNAPSHOT_ROOT"] = config.RepositorySnapshotDirectory! });
+        using var pool = new PreWarmedSandboxPool(0, factory);
+        var capability = new HmacJwtCapabilityTokenService(Options.Create(new CapabilityTokenOptions
+        {
+            Issuer = "diagnostics-evaluation", Audience = "diagnostics-tools",
+            SigningKey = "evaluation-capability-key-local-32-bytes", KeyId = "evaluation-capability"
+        }));
+        var catalog = RepositoryDiagnosticsDefaults.Catalog();
+        var clock = new SystemTimeSource();
+        var service = new DiagnosticsWorkflowService(RepositoryDiagnosticsDefaults.Planner(catalog), RepositoryDiagnosticsDefaults.Policies(),
+            catalog, new PlannerStepExecutor(catalog, capability,
+                new CapabilityEnforcingToolExecutor(capability, new PooledSandboxToolExecutor(pool, Options.Create(config))), clock),
+            new RuleBasedDiagnosticsDecisions(), RepositoryDiagnosticsDefaults.Recovery(retries), new LockedSeedProvider(new RandomSeedGenerator()),
+            clock, new DiagnosticsRuleRouter(), new HmacEventLogIntegrityChain(key, "diagnostics-evaluation"), new HmacManifestSigner(key, "diagnostics-evaluation"));
+        var artifacts = service.CreateArtifacts(runId, scenario.Request, cancellationToken);
+        bool? snapshotRemoved = null;
+        if (staged is not null)
+        {
+            pool.Dispose();
+            Directory.Delete(staged, recursive: true);
+            snapshotRemoved = !Directory.Exists(staged);
+        }
+        return (artifacts, snapshotRemoved);
+    }
+
+    internal static async Task<bool> WriteAndReplayAsync(DiagnosticsWorkflowArtifacts artifacts, string name, string dir, string key,
+        TextWriter stderr, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(dir);
+        await File.WriteAllTextAsync(Path.Combine(dir, "manifest.json"), JsonSerializer.Serialize(artifacts.ManifestRecord, RepositoryToolExecutor.JsonOptions) + "\n", cancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(dir, "eventlog.jsonl"), string.Concat(artifacts.EventLogRecords.Select(r => JsonSerializer.Serialize(r, RepositoryToolExecutor.JsonOptions) + "\n")), cancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(dir, "scenario.json"), JsonSerializer.Serialize(new
+        { name, workflow = "diagnostics", manifestPath = "manifest.json", eventLogPath = "eventlog.jsonl" }, RepositoryToolExecutor.JsonOptions), cancellationToken);
+        using var replayOut = new StringWriter();
+        using var replayError = new StringWriter();
+        var replay = await ReplayCliRunner.RunAsync(["--workflow", "diagnostics", "--artifact-dir", dir, "--hmac-key", key], replayOut, replayError, cancellationToken) == 0;
+        if (!replay) await stderr.WriteLineAsync(replayError.ToString());
+        return replay;
     }
 
     public static DiagnosticsCaseMetrics Measure(DiagnosticsEvaluationCase expected, DiagnosticsWorkflowArtifacts artifacts, bool replay, bool v2,
@@ -209,14 +231,14 @@ public static class DiagnosticsEvaluationRunner
         return new(planning, tool, evidence, outcome.Attempts == (v2 ? expected.ExpectedAttempts : 1), replay && snapshotRemoved != false);
     }
 
-    private static readonly string[] StageNames = ["planning", "tool", "evidence", "recovery", "replay"];
+    internal static readonly string[] StageNames = ["planning", "tool", "evidence", "recovery", "replay"];
     private static IReadOnlyDictionary<string, DiagnosticsStageCount> Summarize(IReadOnlyList<DiagnosticsCaseMetrics> metrics) =>
         StageNames.ToDictionary(name => name, name =>
         {
             var failed = metrics.Where(m => m.Stages is not null && !StageValue(m.Stages, name)).Select(m => m.CaseId).ToArray();
             return new DiagnosticsStageCount(metrics.Count - failed.Length, failed.Length, failed);
         });
-    private static bool StageValue(DiagnosticsStageResults stages, string name) => name switch
+    internal static bool StageValue(DiagnosticsStageResults stages, string name) => name switch
     {
         "planning" => stages.Planning, "tool" => stages.Tool, "evidence" => stages.Evidence, "recovery" => stages.Recovery, _ => stages.Replay
     };

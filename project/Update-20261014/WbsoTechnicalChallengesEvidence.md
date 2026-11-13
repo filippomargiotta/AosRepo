@@ -2,7 +2,7 @@
 
 **Project:** AI-Driven Agentic Orchestration Software (AOC-WebAPI)\
 **Period:** 1 January–31 December 2026\
-**Evidence status date:** 30 October 2026\
+**Evidence status date:** 13 November 2026\
 **Purpose:** working technical-project record for the WBSO administration
 
 This document connects the technical bottlenecks in the original WBSO application to the experiments, failures, implementation decisions, tests, and measurements recorded in this repository. It is not a substitute for the approved application, the hours registration, or advice from the WBSO adviser. Only work actually performed should be entered in the administration.
@@ -313,6 +313,34 @@ The following items belong to the future plan. September's bounded experiments a
   [calibration](evidence/2026-10/container/calibration.json), [verification](evidence/2026-10/verification.json),
   `source/Aos.Core/Models/DiagnosticsCalibration.cs`, `source/Aos.WebApi.Tests/DiagnosticsScoringTests.cs`. Source is an uncommitted
   working-tree implementation based on `cf5b39b`.
+- **Hours registration:** maintained separately by the owner; no hours were entered by this task.
+
+## November 2026 (first half) — TC5 drift signal and repeated/concurrent runs
+
+- **Date / period:** 1–13 November 2026. **Bottleneck:** TC5 (evaluation), applied to the TC3/TC4 diagnostics demonstrator.
+- **Uncertainty:** can a deterministic drift signal over repeated runs of the pinned dataset separate real regressions from host timing
+  noise, and do the pinned cases stay reproducible under concurrent execution?
+- **Prototype:** `repeat-diagnostics` reruns Planner v2 over the twelve cases N times at a chosen concurrency, replays each run from its own
+  signed artifacts, requires one outcome signature per case across runs (run ids, timestamps and latency excluded), and applies one-sided CUSUM.
+  Correctness drift (stage failures) gates; latency drift is reported but does not gate because wall-clock latency is host-dependent.
+- **Observed result:** hardened-container runs, 60 runs at concurrency 1 and 60 at concurrency 4: 12/12 cases stable, 60/60 succeeded,
+  60/60 replayed, no CUSUM alarm. Concurrency 4 raised planner p95 from 0.58 to 12.2 ms and sandbox p50 from 711 to 948 ms; tool p95 was
+  unchanged (about 700 ms). Tool latency and planner overhead are reported separately. Unit tests with injected regressions confirm
+  instability, task failure and stage drift are all flagged.
+- **Platform change:** migrated from .NET 10 to .NET 11 with stable package updates. Golden evaluation (19/19) and the October gate
+  (v1 10/12, v2 12/12, replay 24/24) were unchanged, so the determinism contract held across the runtime change.
+- **Alternatives considered:** gating on latency drift (rejected: noisy on a single host); migrating to `xunit.v3` with the package
+  update (deferred: forces a different test runner and changes the documented commands).
+- **Conclusion and next decision:** reproducibility under repeated and concurrent execution is demonstrated for the deterministic dataset.
+  The detector has only been exercised by synthetic injected failures; its thresholds are hand-set and its false-alarm rate is untested.
+  Real discrimination needs a model-candidate column or injected faults in live runs. Second half of November: frozen AosRepo demo
+  snapshot, weekly drift job with release gate, and a load report at concurrency 1/2/4/8.
+- **Remaining limitation:** the dataset is deterministic, so repeated runs cannot show planner variability; one host only; not a throughput benchmark.
+- **Verification:** 185 standard tests passed (9 container skipped); 196 with containers; 19 golden scenarios.
+- **Evidence:** [November deliverable](deliverables/2026-11.md), [serial report](evidence/2026-11/repeat-c1-report.json),
+  [concurrency-4 report](evidence/2026-11/repeat-c4-report.json), `source/Aos.Core/Models/DiagnosticsDrift.cs`,
+  `source/Aos.ReplayCli/DiagnosticsRepeatRunner.cs`, `source/Aos.WebApi.Tests/DiagnosticsDriftTests.cs`. Source is an uncommitted
+  working-tree implementation based on `c71984d`.
 - **Hours registration:** maintained separately by the owner; no hours were entered by this task.
 
 ## Update template for each new experiment
